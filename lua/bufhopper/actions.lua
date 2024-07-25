@@ -61,6 +61,17 @@ local function get_buffers_column_widths(win_width, max_file_name_length, max_di
   return key_col_width, file_name_col_width, dir_path_col_width
 end
 
+---@param keymap string
+---@return string
+local function get_first_key(keymap)
+  local special_key_pattern = "^<%a+>"
+  local first_key = keymap:match(special_key_pattern)
+  if first_key then
+    return first_key
+  end
+  return keymap:sub(1, 1)
+end
+
 ---Open the floating window.
 ---@param config? BufhopperConfig
 M.open = function(config)
@@ -71,13 +82,52 @@ M.open = function(config)
   end
 
   local ui = vim.api.nvim_list_uis()[1]
+  -- Prepare the actions list.
+  local num_actions = 0
+  ---@type table<string, true>
+  local reserved_action_keys = {}
+  for keymap, _ in pairs(config.actions) do
+    local first_key = get_first_key(keymap)
+    reserved_action_keys[first_key] = true
+    num_actions = num_actions + 1
+  end
+
   -- Prepare the buffers list.
   ---@type {key: string, buf: integer, file_path: string, file_name: string, dir_path: string, project_dir_path: string, buf_indicators: string}[]
   local buffer_keys = {}
   local num_buffers = 0
+
+  local keyset = keysets.determine_keyset(config)
+  local prev_key = nil
+  ---@type fun(context: NextKeyContext): string | nil
+  local next_key_fn
+  if type(config.next_key) == "function" then
+    --- LuaLS gets this wrong.
+    ---@diagnostic disable-next-line: cast-local-type
+    next_key_fn = config.next_key
+  elseif config.next_key == "filename" then
+    next_key_fn = keysets.next_key_filename
+  else -- "sequential"
+    next_key_fn = keysets.next_key_sequential
+  end
+  ---@type table<string, integer>
+  local mapped_keys = {}
+  -- It's okay for functions to mutate this. In fact, it's necessary for the "sequential" algorithm.
+  ---@type NextKeyContext
+  local next_key_context = {
+    config = config,
+    reserved_action_keys = reserved_action_keys,
+    mapped_keys = mapped_keys,
+    keyset = keyset,
+    prev_key = prev_key,
+    key_index = 1,
+    file_name = "",
+  }
+
   local file_name_counts = {}
   local max_file_name_length = 0
   local max_dir_path_length = 0
+
   for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
       goto continue
@@ -98,23 +148,37 @@ M.open = function(config)
       max_dir_path_length = #project_dir_path
     end
     local buf_indicators = get_buffer_indicators(openbuf)
-    num_buffers = num_buffers + 1
-    local key = keysets.ergonomic[num_buffers]
+    next_key_context.file_name = file_name
+    local key
+    for _ = 1, 40 do
+      key = next_key_fn(next_key_context)
+      if key ~= nil then
+        break
+      end
+    end
     if key == nil then
       break
     end
-    table.insert(buffer_keys, {key = key, buf = openbuf, file_path = file_path, file_name = file_name, dir_path = dir_path, project_dir_path = project_dir_path, buf_indicators = buf_indicators})
+    next_key_context.prev_key = key
+    mapped_keys[key] = openbuf
+    table.insert(
+      buffer_keys,
+      {
+        key = key,
+        buf = openbuf,
+        file_path = file_path,
+        file_name = file_name,
+        dir_path = dir_path,
+        project_dir_path = project_dir_path,
+        buf_indicators = buf_indicators,
+      }
+    )
+    num_buffers = num_buffers + 1
     ::continue::
   end
   table.sort(buffer_keys, function(a, b)
     return a.buf < b.buf
   end)
-
-  -- Prepare the actions list.
-  local num_actions = 0
-  for _, _ in pairs(config.actions) do
-    num_actions = num_actions + 1
-  end
 
   local buffers_height, actions_height, win_width = get_windows_dimensions(ui, num_actions, num_actions)
 
@@ -134,7 +198,7 @@ M.open = function(config)
       file_name = string.sub(file_name, 1, file_name_col_width - 1) .. "…"
     end
     local dir_path = buffer_key.project_dir_path
-    if dir_path_col_width == 0 then
+    if file_name_counts[file_name] < 2 or dir_path_col_width == 0 then
       dir_path = ""
     elseif #dir_path > dir_path_col_width then
       dir_path = string.sub(dir_path, 1, dir_path_col_width - 1) .. "…"
@@ -184,7 +248,6 @@ M.open = function(config)
   }
   local buffers_win = vim.api.nvim_open_win(buffers_buf, true, buffers_win_config)
 
-  vim.print(hl_locs)
   for _, hl_loc in ipairs(hl_locs) do
     vim.api.nvim_buf_add_highlight(buffers_buf, 0, hl_loc.name, hl_loc.row, hl_loc.col_start, hl_loc.col_end)
   end
