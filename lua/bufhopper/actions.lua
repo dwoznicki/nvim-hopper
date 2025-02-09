@@ -24,7 +24,7 @@ end
 ---@param num_buffer_rows integer
 ---@param num_action_rows integer
 ---@return integer, integer, integer
-local function get_windows_dimensions(ui, num_buffer_rows, num_action_rows)
+local function get_win_dimensions(ui, num_buffer_rows, num_action_rows)
   local available_width = math.ceil(ui.width * 0.4)
   local available_height = ui.height - 6
   -- First, see how many lines we need to reserve for actions.
@@ -38,10 +38,8 @@ local function get_windows_dimensions(ui, num_buffer_rows, num_action_rows)
 end
 
 ---@param win_width integer
----@param max_file_name_length integer
----@param max_dir_path_length integer
----@return integer, integer, integer
-local function get_buffers_column_widths(win_width, max_file_name_length, max_dir_path_length)
+---@return integer, integer
+local function get_buffers_win_column_widths(win_width)
   -- Reserve space for left-most gutter. Every column should reserve a right-side gutter space.
   local available_width = win_width - 1
   -- Reserve space for key.
@@ -53,12 +51,13 @@ local function get_buffers_column_widths(win_width, max_file_name_length, max_di
   -- local indicators_col_width = 2
   -- available_width = available_width - indicators_col_width - 1
 
-  -- Reserve space for file name. We'll eat space greedily for this column.
-  local file_name_col_width = math.min(max_file_name_length, available_width)
-  available_width = available_width - file_name_col_width - 1
-  -- Any available space can be given to dir path.
-  local dir_path_col_width = math.max(available_width - 1, 0)
-  return key_col_width, file_name_col_width, dir_path_col_width
+  -- -- Reserve space for file name. We'll eat space greedily for this column.
+  -- local file_name_col_width = math.min(max_file_name_length, available_width)
+  -- available_width = available_width - file_name_col_width - 1
+
+  -- Any available space can be given to file path.
+  local file_path_col_width = math.max(available_width - 1, 0)
+  return key_col_width, file_path_col_width
 end
 
 ---@param keymap string
@@ -93,7 +92,7 @@ M.open = function(config)
   end
 
   -- Prepare the buffers list.
-  ---@type {key: string, buf: integer, file_path: string, file_name: string, dir_path: string, project_dir_path: string, buf_indicators: string}[]
+  ---@type {key: string, buf: integer, file_name: string, file_path: string, file_path_tokens: string[], buf_indicators: string}[]
   local buffer_keys = {}
   local num_buffers = 0
 
@@ -124,29 +123,45 @@ M.open = function(config)
     file_name = "",
   }
 
-  local file_name_counts = {}
-  local max_file_name_length = 0
-  local max_dir_path_length = 0
+  ---@type table<string, integer>
+  -- local file_name_counts = {}
+  -- local max_file_name_length = 0
+  -- local max_dir_path_length = 0
+
+  ---@class TreeNode: table<string, TreeNode>
+  local reverse_path_token_tree = {}
 
   for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
-    if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
+    -- if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
+    if vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
       goto continue
     end
-    local file_path = vim.api.nvim_buf_get_name(openbuf)
-    local file_name = vim.fn.fnamemodify(file_path, ":t")
-    if file_name_counts[file_name] == nil then
-      file_name_counts[file_name] = 1
-    else
-      file_name_counts[file_name] = file_name_counts[file_name] + 1
+    -- local file_path = vim.api.nvim_buf_get_name(openbuf)
+    -- local file_name = vim.fn.fnamemodify(file_path, ":t")
+    -- if file_name_counts[file_name] == nil then
+    --   file_name_counts[file_name] = 1
+    -- else
+    --   file_name_counts[file_name] = file_name_counts[file_name] + 1
+    -- end
+    -- if #file_name > max_file_name_length then
+    --   max_file_name_length = #file_name
+    -- end
+    -- local dir_path = string.sub(file_path, 1, -#file_name - 1)
+    -- local project_dir_path = filepath.get_path_from_project_root(dir_path)
+    -- if #project_dir_path > max_dir_path_length then
+    --   max_dir_path_length = #project_dir_path
+    -- end
+    local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(openbuf))
+    local project_file_path_tokens = vim.split(project_file_path, "/")
+    local curr_node = reverse_path_token_tree
+    for i = #project_file_path_tokens, 1, -1 do
+      local path_token = project_file_path_tokens[i]
+      if curr_node[path_token] == nil then
+        curr_node[path_token] = {}
+      end
+      curr_node = curr_node[path_token]
     end
-    if #file_name > max_file_name_length then
-      max_file_name_length = #file_name
-    end
-    local dir_path = string.sub(file_path, 1, -#file_name - 1)
-    local project_dir_path = filepath.get_path_from_project_root(dir_path)
-    if #project_dir_path > max_dir_path_length then
-      max_dir_path_length = #project_dir_path
-    end
+    local file_name = vim.fn.fnamemodify(project_file_path, ":t")
     local buf_indicators = get_buffer_indicators(openbuf)
     next_key_context.file_name = file_name
     local key
@@ -166,10 +181,13 @@ M.open = function(config)
       {
         key = key,
         buf = openbuf,
-        file_path = file_path,
+        -- file_path = file_path,
         file_name = file_name,
-        dir_path = dir_path,
-        project_dir_path = project_dir_path,
+        file_path = project_file_path,
+        file_path_tokens = project_file_path_tokens,
+        -- dir_path = dir_path,
+        -- project_dir_path = project_dir_path,
+        -- project_file_path = project_file_path,
         buf_indicators = buf_indicators,
       }
     )
@@ -180,7 +198,7 @@ M.open = function(config)
     return a.buf < b.buf
   end)
 
-  local buffers_height, actions_height, win_width = get_windows_dimensions(ui, num_actions, num_actions)
+  local buffers_height, actions_height, win_width = get_win_dimensions(ui, num_actions, num_actions)
 
   -- Open the buffers floating window.
   local buffers_buf = vim.api.nvim_create_buf(false, true)
@@ -189,39 +207,153 @@ M.open = function(config)
   vim.api.nvim_set_option_value("swapfile", false, {buf = buffers_buf})
   vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buffers_buf})
   vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
+  ---@type string[]
   local buffer_lines = {}
   local hl_locs = {}
-  local key_col_width, file_name_col_width, dir_path_col_width = get_buffers_column_widths(win_width, max_file_name_length, max_dir_path_length)
+  local key_col_width, file_path_col_width = get_buffers_win_column_widths(win_width)
   for i, buffer_key in ipairs(buffer_keys) do
-    local file_name = buffer_key.file_name
-    if #file_name > file_name_col_width then
-      file_name = string.sub(file_name, 1, file_name_col_width - 1) .. "…"
+    -- local file_name = buffer_key.file_name
+    -- if #file_name > file_path_col_width then
+    --   file_name = string.sub(file_name, 1, file_path_col_width - 1) .. "…"
+    -- end
+    -- local dir_path = buffer_key.project_dir_path
+    -- local file_path_tokens = vim.split(buffer_key.project_dir_path, "/")
+    -- table.insert(file_path_tokens, buffer_key.file_name)
+
+    -- local num_significant_path_tokens = 0
+
+    local remaining_file_path_width = file_path_col_width
+    ---@type string[]
+    local display_path_tokens = {}
+    local significant_path_length = 0
+    local curr_node = reverse_path_token_tree
+    for j = #buffer_key.file_path_tokens, 1, -1 do
+      local path_token = buffer_key.file_path_tokens[j]
+      -- num_significant_path_tokens = num_significant_path_tokens + 1
+      local text_width = vim.fn.strdisplaywidth(path_token)
+      if j ~= 1 then
+        -- Account for leading dir separator.
+        text_width = text_width + 1
+      end
+      -- NOTE: Highlights need byte offsets, not display width. Therefore, we calculate the
+      -- `significant_path_length` with `string.len`.
+      significant_path_length = significant_path_length + string.len(path_token)
+      if j ~= 1 then
+        significant_path_length = significant_path_length + 1
+      end
+      remaining_file_path_width = remaining_file_path_width - text_width
+      if remaining_file_path_width < 0 then
+        break
+      end
+      table.insert(display_path_tokens, 1, path_token)
+      local num_shared_path_tokens = 0
+      for _, _ in pairs(curr_node[path_token]) do
+        num_shared_path_tokens = num_shared_path_tokens + 1
+      end
+      if num_shared_path_tokens < 2 then
+        break
+      end
+      curr_node = curr_node[path_token]
     end
-    local dir_path = buffer_key.project_dir_path
-    if file_name_counts[file_name] < 2 or dir_path_col_width == 0 then
-      dir_path = ""
-    elseif #dir_path > dir_path_col_width then
-      dir_path = string.sub(dir_path, 1, dir_path_col_width - 1) .. "…"
+
+    -- ---@type string[]
+    -- local display_path_tokens = {}
+    -- for j = #buffer_key.file_path_tokens, 1, -1 do
+    --   local path_token = buffer_key.file_path_tokens[j]
+    --   if j ~= 1 then
+    --     path_token = "/" .. path_token
+    --   end
+    --   local text_width = vim.fn.strdisplaywidth(path_token)
+    --   remaining_file_path_width = remaining_file_path_width - text_width
+    --   if remaining_file_path_width < 0 then
+    --     break
+    --   end
+    --   table.insert(display_path_tokens, 1, path_token)
+    -- end
+    for j = 1, #buffer_key.file_path_tokens - #display_path_tokens, 1 do
+      local path_token = buffer_key.file_path_tokens[j]
+      local text_width = vim.fn.strdisplaywidth(path_token)
+      if j ~= 1 then
+        -- Account for leading dir separator.
+        text_width = text_width + 1
+      end
+      if remaining_file_path_width - text_width < 0 then
+        path_token = "…"
+        text_width = vim.fn.strdisplaywidth(path_token)
+        if j ~= 1 then
+          text_width = text_width + 1
+        end
+        if remaining_file_path_width - text_width < 0 then
+          display_path_tokens[j - 1] = "…"
+          break
+        end
+      end
+      remaining_file_path_width = remaining_file_path_width - text_width
+      if remaining_file_path_width < 0 then
+        break
+      end
+      table.insert(display_path_tokens, j, path_token)
     end
+
+    local display_path = table.concat(display_path_tokens, "/")
+    local display_path_width = vim.fn.strdisplaywidth(display_path)
+    local pad_length = math.max(file_path_col_width - display_path_width, 0)
+    local padding = string.rep("_", pad_length)
+    -- NOTE: Highlights need byte offsets, not display width. Therefore, we calculate the
+    -- `significant_path_length` with `string.len`.
+    local non_significant_path_length = string.len(display_path) - significant_path_length
+
+    -- if file_name_counts[file_name] < 2 or dir_path_col_width == 0 then
+    --   dir_path = ""
+    -- elseif #dir_path > dir_path_col_width then
+    --   dir_path = string.sub(dir_path, 1, dir_path_col_width - 1) .. "…"
+    -- end
     table.insert(
       buffer_lines,
-      string.format(
-        " %-" .. key_col_width .. "s %-" .. file_name_col_width .. "s %-" .. dir_path_col_width .. "s",
-        buffer_key.key,
-        file_name,
-        dir_path
-      )
+      "+" .. padding .. display_path .. "+" .. buffer_key.key .. "+"
+      -- string.format(
+      --   -- " %-" .. key_col_width .. "s %-" .. file_path_col_width .. "s",
+      --   " %-" .. file_path_col_width .. "s %-" .. key_col_width .. "s",
+      --   padding .. display_path,
+      --   buffer_key.key
+      --   -- file_name,
+      --   -- dir_path
+      -- )
     )
 
+    vim.print(display_path)
+    -- vim.print(file_path_col_width)
+    -- vim.print(pad_length)
+    -- vim.print(non_significant_path_length)
+    -- vim.print(significant_path_length)
+    -- vim.print(pad_length + non_significant_path_length + significant_path_length)
+    -- vim.print(file_path_col_width)
+    -- vim.print(string.len(display_path))
+    -- vim.print(vim.fn.strdisplaywidth(display_path))
+    -- vim.print(pad_length)
+
     local row = i - 1
-    local col_start, col_end = 1, 2
-    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
-    col_start = col_end + 1
-    col_end = col_start + file_name_col_width
+
+    -- Key at end config
+    local col_start = pad_length + 1
+    local col_end = col_start + non_significant_path_length + 1
+    table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
+    col_start = col_end
+    col_end = col_start + significant_path_length - 1
     table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
     col_start = col_end + 1
-    col_end = col_start + dir_path_col_width
-    table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
+    col_end = col_start + 1
+    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+
+    -- -- Key at beginning config
+    -- local col_start, col_end = 1, 2
+    -- table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+    -- col_start = col_end + 1
+    -- col_end = col_start + non_significant_path_length + 1
+    -- table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
+    -- col_start = col_end
+    -- col_end = col_start + significant_path_length
+    -- table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
 
     vim.keymap.set(
       "n",
