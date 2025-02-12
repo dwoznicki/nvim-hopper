@@ -2,7 +2,6 @@ local M = {}
 
 ---@class NextKeyContext
 ---@field config BufhopperConfig
----@field reserved_action_keys table<string, true>
 ---@field mapped_keys table<string, integer>
 ---@field keyset string[]
 ---@field prev_key string | nil
@@ -34,7 +33,7 @@ M.next_key_sequential = function(context)
       break
     end
     context.key_index = context.key_index + 1
-    if context.mapped_keys[key] ~= nil or context.reserved_action_keys[key] ~= nil then
+    if context.mapped_keys[key] ~= nil then
       goto continue
     else
       break
@@ -53,7 +52,7 @@ M.next_key_filename = function(context)
     if key == nil then
       break
     end
-    if context.mapped_keys[key] ~= nil or context.reserved_action_keys[key] ~= nil then
+    if context.mapped_keys[key] ~= nil then
       goto continue
     end
     local found_in_keyset = false

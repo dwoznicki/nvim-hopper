@@ -76,23 +76,6 @@ end
 ---@param config BufhopperConfig
 ---@return table<BufferKeyMapping>
 local function get_buffer_keymappings(config)
-  -- if config == nil then
-  --   config = bufhopper_config.global_config
-  -- else
-  --   config = vim.tbl_extend("force", bufhopper_config.global_config, config)
-  -- end
-
-  -- local ui = vim.api.nvim_list_uis()[1]
-  -- Prepare the actions list.
-  -- local num_actions = 0
-  ---@type table<string, true>
-  local reserved_action_keys = {}
-  -- for keymap, _ in pairs(config.actions) do
-  --   local first_key = get_first_key(keymap)
-  --   reserved_action_keys[first_key] = true
-  --   num_actions = num_actions + 1
-  -- end
-
   -- Prepare the buffers list.
   ---@type BufferKeyMapping[]
   local buffer_keys = {}
@@ -117,7 +100,6 @@ local function get_buffer_keymappings(config)
   ---@type NextKeyContext
   local next_key_context = {
     config = config,
-    reserved_action_keys = reserved_action_keys,
     mapped_keys = mapped_keys,
     keyset = keyset,
     prev_key = prev_key,
@@ -152,13 +134,9 @@ local function get_buffer_keymappings(config)
       {
         key = key,
         buf = openbuf,
-        -- file_path = file_path,
         file_name = file_name,
         file_path = project_file_path,
         file_path_tokens = project_file_path_tokens,
-        -- dir_path = dir_path,
-        -- project_dir_path = project_dir_path,
-        -- project_file_path = project_file_path,
         buf_indicators = buf_indicators,
       }
     )
@@ -173,13 +151,13 @@ end
 
 ---@param buf integer
 ---@param buffer_keys table<BufferKeyMapping>
----@param file_path_col_width integer
-local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
-  vim.print(buffer_keys)
-  -- Clear lines from buffer.
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
-  -- Clear highlighting from buffer.
-  vim.api.nvim_buf_clear_namespace(buf, 0, 0, -1)
+---@param win_width? integer
+local function draw_buffer_lines(buf, buffer_keys, win_width)
+  if win_width == nil then
+    local ui = vim.api.nvim_list_uis()[1]
+    _, win_width = get_win_dimensions(ui, #buffer_keys)
+  end
+  local key_col_width, file_path_col_width = get_buffers_win_column_widths(win_width)
 
   ---@class TreeNode: table<string, TreeNode>
   local reverse_path_token_tree = {}
@@ -200,16 +178,6 @@ local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
   local hl_locs = {}
 
   for i, buffer_key in ipairs(buffer_keys) do
-    -- local file_name = buffer_key.file_name
-    -- if #file_name > file_path_col_width then
-    --   file_name = string.sub(file_name, 1, file_path_col_width - 1) .. "…"
-    -- end
-    -- local dir_path = buffer_key.project_dir_path
-    -- local file_path_tokens = vim.split(buffer_key.project_dir_path, "/")
-    -- table.insert(file_path_tokens, buffer_key.file_name)
-
-    -- local num_significant_path_tokens = 0
-
     local remaining_file_path_width = file_path_col_width
     ---@type string[]
     local display_path_tokens = {}
@@ -217,7 +185,6 @@ local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
     local curr_node = reverse_path_token_tree
     for j = #buffer_key.file_path_tokens, 1, -1 do
       local path_token = buffer_key.file_path_tokens[j]
-      -- num_significant_path_tokens = num_significant_path_tokens + 1
       local text_width = vim.fn.strdisplaywidth(path_token)
       if j ~= 1 then
         -- Account for leading dir separator.
@@ -244,20 +211,6 @@ local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
       curr_node = curr_node[path_token]
     end
 
-    -- ---@type string[]
-    -- local display_path_tokens = {}
-    -- for j = #buffer_key.file_path_tokens, 1, -1 do
-    --   local path_token = buffer_key.file_path_tokens[j]
-    --   if j ~= 1 then
-    --     path_token = "/" .. path_token
-    --   end
-    --   local text_width = vim.fn.strdisplaywidth(path_token)
-    --   remaining_file_path_width = remaining_file_path_width - text_width
-    --   if remaining_file_path_width < 0 then
-    --     break
-    --   end
-    --   table.insert(display_path_tokens, 1, path_token)
-    -- end
     for j = 1, #buffer_key.file_path_tokens - #display_path_tokens, 1 do
       local path_token = buffer_key.file_path_tokens[j]
       local text_width = vim.fn.strdisplaywidth(path_token)
@@ -287,12 +240,6 @@ local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
     -- NOTE: Highlights need byte offsets, not display width. Therefore, we calculate the
     -- `significant_path_length` with `string.len`.
     local non_significant_path_length = string.len(display_path) - significant_path_length
-
-    -- if file_name_counts[file_name] < 2 or dir_path_col_width == 0 then
-    --   dir_path = ""
-    -- elseif #dir_path > dir_path_col_width then
-    --   dir_path = string.sub(dir_path, 1, dir_path_col_width - 1) .. "…"
-    -- end
 
     local row = i - 1
 
@@ -328,10 +275,20 @@ local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
     col_end = col_start + significant_path_length
     table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
   end
+
+  vim.api.nvim_set_option_value("modifiable", true, {buf = buf})
+  -- Clear lines from buffer.
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
+  -- Clear highlighting from buffer.
+  vim.api.nvim_buf_clear_namespace(buf, 0, 0, -1)
+
+  -- Draw the buffer keymapping lines.
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, buffer_lines)
+  -- Add highlights.
   for _, hl_loc in ipairs(hl_locs) do
     vim.api.nvim_buf_add_highlight(buf, 0, hl_loc.name, hl_loc.row, hl_loc.col_start, hl_loc.col_end)
   end
+  vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
 end
 
 
@@ -350,9 +307,7 @@ function M.open(config)
 
   -- Open the buffers floating window.
   local buffers_buf = vim.api.nvim_create_buf(false, true)
-  local key_col_width, file_path_col_width = get_buffers_win_column_widths(win_width)
-  draw_buffer_lines(buffers_buf, buffer_keys, file_path_col_width)
-  vim.api.nvim_set_option_value("modifiable", false, {buf = buffers_buf})
+  draw_buffer_lines(buffers_buf, buffer_keys, win_width)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buffers_buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buffers_buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buffers_buf})
@@ -385,7 +340,7 @@ function M.open(config)
       "n",
       buffer_key.key,
       function()
-        vim.api.nvim_win_set_cursor(M._buffers_win, {i, 0})
+        vim.api.nvim_win_set_cursor(buffers_win, {i, 0})
         if M._keypress_mode == "open" then
           vim.defer_fn(
             function()
@@ -397,7 +352,7 @@ function M.open(config)
           return
         end
       end,
-      {noremap = true, silent = true, buffer = M._buffers_buf}
+      {noremap = true, silent = true, buffer = buffers_buf}
     )
   end
   vim.keymap.set(
@@ -411,7 +366,7 @@ function M.open(config)
         false
       )
     end,
-    {silent = true, buffer = M._buffers_buf}
+    {silent = true, buffer = buffers_buf}
   )
   vim.keymap.set(
     "n",
@@ -424,14 +379,23 @@ function M.open(config)
         false
       )
     end,
-    {silent = true, buffer = M._buffers_buf}
+    {silent = true, buffer = buffers_buf}
   )
   vim.keymap.set(
     "n",
     "dd",
     function()
+      local cursor_pos = vim.api.nvim_win_get_cursor(buffers_win)
+      local buffer_idx = cursor_pos[1]
+      ---@type BufferKeyMapping | nil
+      local buffer_key = buffer_keys[buffer_idx]
+      if buffer_key ~= nil then
+        vim.api.nvim_buf_delete(buffer_key.buf, {})
+        table.remove(buffer_keys, buffer_idx)
+        draw_buffer_lines(buffers_buf, buffer_keys)
+      end
     end,
-    {silent = true, buffer = M._buffers_buf}
+    {silent = true, buffer = buffers_buf}
   )
 
   M._buffers_buf = buffers_buf
