@@ -4,6 +4,13 @@ local bufhopper_config = require("bufhopper.config")
 
 local M = {}
 
+---@class BufferKeyMapping
+---@field key string
+---@field buf integer
+---@field file_name string
+---@field file_path string
+---@field file_path_tokens string[]
+
 ---@param buf integer
 ---@return string
 local function get_buffer_indicators(buf)
@@ -22,19 +29,14 @@ end
 
 ---@param ui table<string, unknown>
 ---@param num_buffer_rows integer
----@param num_action_rows integer
----@return integer, integer, integer
-local function get_win_dimensions(ui, num_buffer_rows, num_action_rows)
+---@return integer, integer
+local function get_win_dimensions(ui, num_buffer_rows)
   local available_width = math.ceil(ui.width * 0.4)
   local available_height = ui.height - 6
-  -- First, see how many lines we need to reserve for actions.
-  -- If there are no actions, we won't show the floating window.
-  local actions_height = num_action_rows
-  available_height = available_height - actions_height
   -- For buffer list height, we'll try and choose a reasonable height without going over the
   -- available remaining space.
   local buffers_height = math.max(math.min(num_buffer_rows, available_height), 10)
-  return buffers_height, actions_height, available_width
+  return buffers_height, available_width
 end
 
 ---@param win_width integer
@@ -71,28 +73,28 @@ local function get_first_key(keymap)
   return keymap:sub(1, 1)
 end
 
----Open the floating window.
----@param config? BufhopperConfig
-M.open = function(config)
-  if config == nil then
-    config = bufhopper_config.global_config
-  else
-    config = vim.tbl_extend("force", bufhopper_config.global_config, config)
-  end
+---@param config BufhopperConfig
+---@return table<BufferKeyMapping>
+local function get_buffer_keymappings(config)
+  -- if config == nil then
+  --   config = bufhopper_config.global_config
+  -- else
+  --   config = vim.tbl_extend("force", bufhopper_config.global_config, config)
+  -- end
 
-  local ui = vim.api.nvim_list_uis()[1]
+  -- local ui = vim.api.nvim_list_uis()[1]
   -- Prepare the actions list.
-  local num_actions = 0
+  -- local num_actions = 0
   ---@type table<string, true>
   local reserved_action_keys = {}
-  for keymap, _ in pairs(config.actions) do
-    local first_key = get_first_key(keymap)
-    reserved_action_keys[first_key] = true
-    num_actions = num_actions + 1
-  end
+  -- for keymap, _ in pairs(config.actions) do
+  --   local first_key = get_first_key(keymap)
+  --   reserved_action_keys[first_key] = true
+  --   num_actions = num_actions + 1
+  -- end
 
   -- Prepare the buffers list.
-  ---@type {key: string, buf: integer, file_name: string, file_path: string, file_path_tokens: string[], buf_indicators: string}[]
+  ---@type BufferKeyMapping[]
   local buffer_keys = {}
   local num_buffers = 0
 
@@ -123,44 +125,13 @@ M.open = function(config)
     file_name = "",
   }
 
-  ---@type table<string, integer>
-  -- local file_name_counts = {}
-  -- local max_file_name_length = 0
-  -- local max_dir_path_length = 0
-
-  ---@class TreeNode: table<string, TreeNode>
-  local reverse_path_token_tree = {}
-
   for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
     -- if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
     if vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
       goto continue
     end
-    -- local file_path = vim.api.nvim_buf_get_name(openbuf)
-    -- local file_name = vim.fn.fnamemodify(file_path, ":t")
-    -- if file_name_counts[file_name] == nil then
-    --   file_name_counts[file_name] = 1
-    -- else
-    --   file_name_counts[file_name] = file_name_counts[file_name] + 1
-    -- end
-    -- if #file_name > max_file_name_length then
-    --   max_file_name_length = #file_name
-    -- end
-    -- local dir_path = string.sub(file_path, 1, -#file_name - 1)
-    -- local project_dir_path = filepath.get_path_from_project_root(dir_path)
-    -- if #project_dir_path > max_dir_path_length then
-    --   max_dir_path_length = #project_dir_path
-    -- end
     local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(openbuf))
     local project_file_path_tokens = vim.split(project_file_path, "/")
-    local curr_node = reverse_path_token_tree
-    for i = #project_file_path_tokens, 1, -1 do
-      local path_token = project_file_path_tokens[i]
-      if curr_node[path_token] == nil then
-        curr_node[path_token] = {}
-      end
-      curr_node = curr_node[path_token]
-    end
     local file_name = vim.fn.fnamemodify(project_file_path, ":t")
     local buf_indicators = get_buffer_indicators(openbuf)
     next_key_context.file_name = file_name
@@ -197,20 +168,37 @@ M.open = function(config)
   table.sort(buffer_keys, function(a, b)
     return a.buf < b.buf
   end)
+  return buffer_keys
+end
 
-  local buffers_height, actions_height, win_width = get_win_dimensions(ui, num_actions, num_actions)
+---@param buf integer
+---@param buffer_keys table<BufferKeyMapping>
+---@param file_path_col_width integer
+local function draw_buffer_lines(buf, buffer_keys, file_path_col_width)
+  vim.print(buffer_keys)
+  -- Clear lines from buffer.
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
+  -- Clear highlighting from buffer.
+  vim.api.nvim_buf_clear_namespace(buf, 0, 0, -1)
 
-  -- Open the buffers floating window.
-  local buffers_buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_set_option_value("buftype", "nofile", {buf = buffers_buf})
-  vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buffers_buf})
-  vim.api.nvim_set_option_value("swapfile", false, {buf = buffers_buf})
-  vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buffers_buf})
-  vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
+  ---@class TreeNode: table<string, TreeNode>
+  local reverse_path_token_tree = {}
+
+  for _, buffer_key in ipairs(buffer_keys) do
+    local curr_node = reverse_path_token_tree
+    for i = #buffer_key.file_path_tokens, 1, -1 do
+      local path_token = buffer_key.file_path_tokens[i]
+      if curr_node[path_token] == nil then
+        curr_node[path_token] = {}
+      end
+      curr_node = curr_node[path_token]
+    end
+  end
+
   ---@type string[]
   local buffer_lines = {}
   local hl_locs = {}
-  local key_col_width, file_path_col_width = get_buffers_win_column_widths(win_width)
+
   for i, buffer_key in ipairs(buffer_keys) do
     -- local file_name = buffer_key.file_name
     -- if #file_name > file_path_col_width then
@@ -296,9 +284,6 @@ M.open = function(config)
     end
 
     local display_path = table.concat(display_path_tokens, "/")
-    local display_path_width = vim.fn.strdisplaywidth(display_path)
-    local pad_length = math.max(file_path_col_width - display_path_width, 0)
-    local padding = string.rep("_", pad_length)
     -- NOTE: Highlights need byte offsets, not display width. Therefore, we calculate the
     -- `significant_path_length` with `string.len`.
     local non_significant_path_length = string.len(display_path) - significant_path_length
@@ -308,275 +293,168 @@ M.open = function(config)
     -- elseif #dir_path > dir_path_col_width then
     --   dir_path = string.sub(dir_path, 1, dir_path_col_width - 1) .. "…"
     -- end
-    table.insert(
-      buffer_lines,
-      "+" .. padding .. display_path .. "+" .. buffer_key.key .. "+"
-      -- string.format(
-      --   -- " %-" .. key_col_width .. "s %-" .. file_path_col_width .. "s",
-      --   " %-" .. file_path_col_width .. "s %-" .. key_col_width .. "s",
-      --   padding .. display_path,
-      --   buffer_key.key
-      --   -- file_name,
-      --   -- dir_path
-      -- )
-    )
-
-    vim.print(display_path)
-    -- vim.print(file_path_col_width)
-    -- vim.print(pad_length)
-    -- vim.print(non_significant_path_length)
-    -- vim.print(significant_path_length)
-    -- vim.print(pad_length + non_significant_path_length + significant_path_length)
-    -- vim.print(file_path_col_width)
-    -- vim.print(string.len(display_path))
-    -- vim.print(vim.fn.strdisplaywidth(display_path))
-    -- vim.print(pad_length)
 
     local row = i - 1
 
-    -- Key at end config
-    local col_start = pad_length + 1
-    local col_end = col_start + non_significant_path_length + 1
-    table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
-    col_start = col_end
-    col_end = col_start + significant_path_length - 1
-    table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
-    col_start = col_end + 1
-    col_end = col_start + 1
-    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
-
-    -- -- Key at beginning config
-    -- local col_start, col_end = 1, 2
-    -- table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
-    -- col_start = col_end + 1
-    -- col_end = col_start + non_significant_path_length + 1
+    -- -- Key at end config
+    -- local display_path_width = vim.fn.strdisplaywidth(display_path)
+    -- local pad_length = math.max(file_path_col_width - display_path_width, 0)
+    -- local padding = string.rep(" ", pad_length)
+    -- table.insert(
+    --   buffer_lines,
+    --   " " .. padding .. display_path .. " " .. buffer_key.key .. " "
+    -- )
+    -- local col_start = pad_length + 1
+    -- local col_end = col_start + non_significant_path_length + 1
     -- table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
     -- col_start = col_end
-    -- col_end = col_start + significant_path_length
+    -- col_end = col_start + significant_path_length - 1
     -- table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
+    -- col_start = col_end + 1
+    -- col_end = col_start + 1
+    -- table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
 
-    vim.keymap.set(
-      "n",
-      buffer_key.key,
-      function()
-        M.close()
-        vim.api.nvim_set_current_buf(buffer_key.buf)
-      end,
-      {noremap = true, silent = true, buffer = buffers_buf}
+    -- Key at beginning config
+    table.insert(
+      buffer_lines,
+      " " .. buffer_key.key .. " " .. display_path .. " "
     )
+    local col_start, col_end = 1, 2
+    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+    col_start = col_end + 1
+    col_end = col_start + non_significant_path_length + 1
+    table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
+    col_start = col_end
+    col_end = col_start + significant_path_length
+    table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
   end
-  vim.api.nvim_buf_set_lines(buffers_buf, 0, -1, false, buffer_lines)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, buffer_lines)
+  for _, hl_loc in ipairs(hl_locs) do
+    vim.api.nvim_buf_add_highlight(buf, 0, hl_loc.name, hl_loc.row, hl_loc.col_start, hl_loc.col_end)
+  end
+end
+
+
+---Open the floating window.
+---@param config? BufhopperConfig
+function M.open(config)
+  if config == nil then
+    config = bufhopper_config.global_config
+  else
+    config = vim.tbl_extend("force", bufhopper_config.global_config, config)
+  end
+
+  local buffer_keys = get_buffer_keymappings(config)
+  local ui = vim.api.nvim_list_uis()[1]
+  local buffers_height, win_width = get_win_dimensions(ui, #buffer_keys)
+
+  -- Open the buffers floating window.
+  local buffers_buf = vim.api.nvim_create_buf(false, true)
+  local key_col_width, file_path_col_width = get_buffers_win_column_widths(win_width)
+  draw_buffer_lines(buffers_buf, buffer_keys, file_path_col_width)
   vim.api.nvim_set_option_value("modifiable", false, {buf = buffers_buf})
+  vim.api.nvim_set_option_value("buftype", "nofile", {buf = buffers_buf})
+  vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buffers_buf})
+  vim.api.nvim_set_option_value("swapfile", false, {buf = buffers_buf})
+  vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buffers_buf})
+  vim.keymap.set("n", "q", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
 
   local buffers_win_config = {
     style = "minimal",
     relative = "editor",
     width = win_width,
     height = buffers_height,
-    row = 1,
-    col = math.ceil(ui.width - win_width) - 3,
-    title = "Buffers",
+    row = math.floor((ui.height - buffers_height) * 0.5) - 1,
+    col = math.floor((ui.width - win_width) * 0.5),
+    title = " Buffers ",
+    title_pos = "center",
     border = "rounded",
   }
   local buffers_win = vim.api.nvim_open_win(buffers_buf, true, buffers_win_config)
+  vim.api.nvim_set_option_value("cursorline", true, {win = buffers_win})
+  vim.api.nvim_set_option_value("winhighlight", "CursorLine:BufhopperCursorLine", {win = buffers_win})
 
-  for _, hl_loc in ipairs(hl_locs) do
-    vim.api.nvim_buf_add_highlight(buffers_buf, 0, hl_loc.name, hl_loc.row, hl_loc.col_start, hl_loc.col_end)
+  for i, buffer_key in ipairs(buffer_keys) do
+    -- pcall(
+    --   vim.keymap.del,
+    --   "n",
+    --   buffer_key.key,
+    --   {buffer = M._buffers_buf}
+    -- )
+    vim.keymap.set(
+      "n",
+      buffer_key.key,
+      function()
+        vim.api.nvim_win_set_cursor(M._buffers_win, {i, 0})
+        if M._keypress_mode == "open" then
+          vim.defer_fn(
+            function()
+              M.close()
+              vim.api.nvim_set_current_buf(buffer_key.buf)
+            end,
+            50
+          )
+          return
+        end
+      end,
+      {noremap = true, silent = true, buffer = M._buffers_buf}
+    )
   end
+  vim.keymap.set(
+    "n",
+    "j",
+    function()
+      M._keypress_mode = "jump"
+      vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes("j", true, false, true),
+        "n",
+        false
+      )
+    end,
+    {silent = true, buffer = M._buffers_buf}
+  )
+  vim.keymap.set(
+    "n",
+    "k",
+    function()
+      M._keypress_mode = "jump"
+      vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes("k", true, false, true),
+        "n",
+        false
+      )
+    end,
+    {silent = true, buffer = M._buffers_buf}
+  )
+  vim.keymap.set(
+    "n",
+    "dd",
+    function()
+    end,
+    {silent = true, buffer = M._buffers_buf}
+  )
 
-  -- Open the actions floating window.
-  local actions_buf
-  local actions_win
-  if num_actions > 0 then
-    actions_buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_set_option_value("buftype", "nofile", {buf = actions_buf})
-    vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = actions_buf})
-    vim.api.nvim_set_option_value("swapfile", false, {buf = actions_buf})
-    vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = actions_buf})
-    vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = actions_buf})
-    local actions_win_config = {
-      style = "minimal",
-      relative = "editor",
-      width = win_width,
-      height = actions_height,
-      row = buffers_height + 3,
-      col = math.ceil(ui.width - win_width) - 3,
-      title = "Actions",
-      border = "rounded",
-    }
-    actions_win = vim.api.nvim_open_win(actions_buf, false, actions_win_config)
-  end
-
-  M._buffer_keys = buffer_keys
   M._buffers_buf = buffers_buf
   M._buffers_win = buffers_win
-  M._actions_buf = actions_buf
-  M._actions_win = actions_win
+  M._keypress_mode = "open"
 
   vim.api.nvim_create_autocmd("BufWipeout", {
     buffer = buffers_buf,
     callback = function()
-      if M._actions_win ~= nil then
-        vim.api.nvim_win_close(M._actions_win, true)
-      end
       M._buffer_keys = nil
       M._buffers_buf = nil
       M._buffers_win = nil
-      M._actions_buf = nil
-      M._actions_win = nil
     end,
   })
 end
 
--- ---Open the overlay.
--- ---@param config BufhopperConfig
--- M._open = function(config)
---   local ui = vim.api.nvim_list_uis()[1]
---   local width = math.ceil(ui.width * 0.3)
---   local height = math.ceil(ui.height * 0.7)
---   local options = {
---     style = "minimal",
---     relative = "editor",
---     width = width,
---     height = height,
---     row = 1,
---     col = math.ceil(ui.width - width) - 3,
---     title = "Buffers",
---     border = "rounded",
---   }
---   local buf = vim.api.nvim_create_buf(false, true)
---   local win = vim.api.nvim_open_win(buf, true, options)
---   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
---   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
---   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
---   vim.api.nvim_set_option_value("filetype", "bufferoverlay", {buf = buf})
---   vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = buf})
---
---   local buffer_keys = {}
---   local i = 1
---   for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
---     if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
---       goto continue
---     end
---     local file_path = vim.api.nvim_buf_get_name(openbuf)
---     local key = keysets.ergonomic[i]
---     if key == nil then
---       break
---     end
---     i = i + 1
---     vim.keymap.set(
---       "n",
---       key,
---       function()
---         M.close()
---         vim.api.nvim_set_current_buf(openbuf)
---       end,
---       {noremap = true, silent = true, buffer = buf}
---     )
---     table.insert(buffer_keys, {key = key, buf = openbuf, file_path = file_path})
---     ::continue::
---   end
---
---   table.sort(buffer_keys, function(a, b)
---     return a.buf < b.buf
---   end)
---
---   local keymap_col_width = 1
---   local file_path_col_width = math.floor(width - keymap_col_width - 5)
---
---   local lines = {}
---   table.insert(lines, "")
---   local hl_locs = {}
---   for j, buffer_key in ipairs(buffer_keys) do
---     local file_name = vim.fn.fnamemodify(buffer_key.file_path, ":t")
---     local file_name_len = string.len(file_name)
---     local path_without_file_name = string.sub(buffer_key.file_path, 1, -file_name_len - 1)
---     local available_col_width = file_path_col_width - file_name_len
---     local dir_path
---     if available_col_width < 1 then
---       -- This is either a really long file name, or we have very little space to work with.
---       -- We'll need to truncate the file name. Unlike path truncation, we'll slice characters off
---       -- the tail instead of off the beginning.
---       file_name = string.sub(file_name, 1, available_col_width - 1) .. "…"
---       dir_path = ""
---     else
---       dir_path = filepath.get_path_from_project_root(path_without_file_name)
---       local char_overflow = string.len(dir_path) - available_col_width
---       if char_overflow > available_col_width then
---         -- We don't have room for any of the path.
---         dir_path = ""
---       elseif char_overflow > 0 then
---         dir_path = "…" .. string.sub(dir_path, char_overflow, -1)
---       end
---     end
---     local file_path = dir_path .. file_name
---     table.insert(lines, string.format(" %-" .. keymap_col_width .. "s %-" .. string.len(file_path) .. "s ", buffer_key.key, file_path))
---
---     local row = j
---     local col_start, col_end = 1, 2
---     table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
---     col_start = col_end + 1
---     col_end = col_start + string.len(dir_path)
---     table.insert(hl_locs, {name = "BufhopperFilePath", row = row, col_start = col_start, col_end = col_end})
---     col_start = col_end
---     col_end = col_start + string.len(file_name)
---     table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
---   end
---
---   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
---   vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
---
---   for _, hl_loc in ipairs(hl_locs) do
---     vim.api.nvim_buf_add_highlight(buf, 0, hl_loc.name, hl_loc.row, hl_loc.col_start, hl_loc.col_end)
---   end
---
---   if config.actions and next(config.actions) ~= nil then
---     local num_actions = 0
---     for _, _ in pairs(config.actions) do
---       num_actions = num_actions + 1
---     end
---     local actions_width = width
---     local actions_height = num_actions
---     local actions_options = {
---       style = "minimal",
---       relative = "editor",
---       width = actions_width,
---       height = actions_height,
---       row = 1,
---       col = math.ceil(ui.width - actions_width) - 3,
---       title = "Actions",
---       border = "rounded",
---     }
---     local actions_buf = vim.api.nvim_create_buf(false, true)
---     local actions_win = vim.api.nvim_open_win(actions_buf, true, actions_options)
---     vim.api.nvim_set_option_value("buftype", "nofile", {buf = actions_buf})
---     vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = actions_buf})
---     vim.api.nvim_set_option_value("swapfile", false, {buf = actions_buf})
---     vim.api.nvim_set_option_value("filetype", "bufferoverlay", {buf = actions_buf})
---     vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = actions_buf})
---   end
---
---   M._buffer_keys = buffer_keys
---   M._overlay_buf = buf
---   M._overlay_win = win
---
---   vim.api.nvim_create_autocmd("BufWipeout", {
---     buffer = buf,
---     callback = function()
---       M._buffer_keys = nil
---       M._overlay_buf = nil
---       M._overlay_win = nil
---     end,
---   })
--- end
-
-M.close = function()
+function M.close()
   if M._buffers_win and vim.api.nvim_win_is_valid(M._buffers_win) then
     vim.api.nvim_win_close(M._buffers_win, true)
   end
 end
 
-M.delete_other_buffers = function()
+function M.delete_other_buffers()
   M.close()
   local curbuf = vim.api.nvim_get_current_buf()
   local num_closed = 0

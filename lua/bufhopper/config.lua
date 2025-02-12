@@ -1,7 +1,6 @@
 local M = {}
 
 ---@class BufhopperConfig
----@field actions table<string, fun(): any>
 ---@field keyset "alpha" | "numeric" | "ergonomic" | string[]
 ---@field next_key "sequential" | "filename" | fun(context: NextKeyContext): string | nil
 local BufhopperConfig = {}
@@ -9,9 +8,9 @@ local BufhopperConfig = {}
 ---@return BufhopperConfig
 M.default_config = function()
   return {
-    actions = {
-      ["do"] = require("bufhopper.actions").delete_other_buffers,
-    },
+    -- actions = {
+    --   ["do"] = require("bufhopper.actions").delete_other_buffers,
+    -- },
     keyset = "ergonomic",
     next_key = "filename",
   }

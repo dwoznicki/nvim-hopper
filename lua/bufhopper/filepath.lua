@@ -27,6 +27,7 @@ local root_markers = {
   "spago.dhall",
 }
 
+---@param dir string
 local function is_project_root(dir)
   for _, marker in ipairs(root_markers) do
     if vim.fn.filereadable(vim.fn.expand(dir .. "/" .. marker)) == 1 or
@@ -37,6 +38,7 @@ local function is_project_root(dir)
   return false
 end
 
+---@param starting_dir string
 local function find_project_root(starting_dir)
   local dir = starting_dir
   while dir ~= "/" do
@@ -48,6 +50,8 @@ local function find_project_root(starting_dir)
   return nil
 end
 
+---@param file_path string
+---@return string
 function M.get_path_from_project_root(file_path)
   local abs_path = vim.fn.expand(file_path)
   local file_dir = vim.fn.fnamemodify(abs_path, ":h")
