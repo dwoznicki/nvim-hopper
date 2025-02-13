@@ -10,21 +10,18 @@ local M = {}
 ---@field file_name string
 ---@field file_path string
 ---@field file_path_tokens string[]
+---@field buf_indicators string
 
 ---@param buf integer
+---@param current_buf integer
+---@param alternate_buf integer
 ---@return string
-local function get_buffer_indicators(buf)
+local function get_buffer_indicators(buf, current_buf, alternate_buf)
   local buf_info = vim.fn.getbufinfo(buf)[1]
-  local indicators = ""
-  if buf_info.loaded == 1 then
-    indicators = indicators .. "a"
-  elseif buf_info.hidden == 1 then
-    indicators = indicators .. "h"
-  end
-  if buf_info.changed == 1 then
-    indicators = indicators .. "+"
-  end
-  return indicators
+  local indicator1 = (buf == current_buf) and "%" or (buf== alternate_buf and "#" or " ")
+  local indicator2 = (#buf_info.windows > 0) and "a" or "h"
+  local mod_indicator = (buf_info.changed == 1) and "+" or " "
+  return indicator1 .. indicator2 .. mod_indicator
 end
 
 ---@param ui table<string, unknown>
@@ -40,7 +37,7 @@ local function get_win_dimensions(ui, num_buffer_rows)
 end
 
 ---@param win_width integer
----@return integer, integer
+---@return integer, integer, integer
 local function get_buffers_win_column_widths(win_width)
   -- Reserve space for left-most gutter. Every column should reserve a right-side gutter space.
   local available_width = win_width - 1
@@ -48,10 +45,9 @@ local function get_buffers_win_column_widths(win_width)
   local key_col_width = 1
   available_width = available_width - key_col_width - 1
 
-  -- NOTE: Removing for now. Don't like how it looks. 
   -- Reserve space for buffer indicators characters (e.g. "a", "%", "+").
-  -- local indicators_col_width = 2
-  -- available_width = available_width - indicators_col_width - 1
+  local indicators_col_width = 3
+  available_width = available_width - indicators_col_width - 1
 
   -- -- Reserve space for file name. We'll eat space greedily for this column.
   -- local file_name_col_width = math.min(max_file_name_length, available_width)
@@ -59,7 +55,7 @@ local function get_buffers_win_column_widths(win_width)
 
   -- Any available space can be given to file path.
   local file_path_col_width = math.max(available_width - 1, 0)
-  return key_col_width, file_path_col_width
+  return key_col_width, file_path_col_width, indicators_col_width
 end
 
 ---@param keymap string
@@ -107,6 +103,8 @@ local function get_buffer_keymappings(config)
     file_name = "",
   }
 
+  local current_buf = vim.api.nvim_get_current_buf()
+  local alternate_buf = vim.fn.bufnr('#')
   for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
     -- if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
     if vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
@@ -115,7 +113,7 @@ local function get_buffer_keymappings(config)
     local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(openbuf))
     local project_file_path_tokens = vim.split(project_file_path, "/")
     local file_name = vim.fn.fnamemodify(project_file_path, ":t")
-    local buf_indicators = get_buffer_indicators(openbuf)
+    local buf_indicators = get_buffer_indicators(openbuf, current_buf, alternate_buf)
     next_key_context.file_name = file_name
     local key
     for _ = 1, 40 do
@@ -157,7 +155,7 @@ local function draw_buffer_lines(buf, buffer_keys, win_width)
     local ui = vim.api.nvim_list_uis()[1]
     _, win_width = get_win_dimensions(ui, #buffer_keys)
   end
-  local key_col_width, file_path_col_width = get_buffers_win_column_widths(win_width)
+  local key_col_width, file_path_col_width, indicators_col_width = get_buffers_win_column_widths(win_width)
 
   ---@class TreeNode: table<string, TreeNode>
   local reverse_path_token_tree = {}
@@ -264,7 +262,7 @@ local function draw_buffer_lines(buf, buffer_keys, win_width)
     -- Key at beginning config
     table.insert(
       buffer_lines,
-      " " .. buffer_key.key .. " " .. display_path .. " "
+      " " .. buffer_key.key .. " " .. display_path .. " " .. buffer_key.buf_indicators
     )
     local col_start, col_end = 1, 2
     table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
@@ -295,11 +293,18 @@ end
 ---Open the floating window.
 ---@param config? BufhopperConfig
 function M.open(config)
+  if M._buffers_win and vim.api.nvim_win_is_valid(M._buffers_win) then
+    -- The float is already open.
+    return
+  end
   if config == nil then
     config = bufhopper_config.global_config
   else
     config = vim.tbl_extend("force", bufhopper_config.global_config, config)
   end
+
+  -- The buffer that we were on before opening the float.
+  local current_buf = vim.api.nvim_get_current_buf()
 
   local buffer_keys = get_buffer_keymappings(config)
   local ui = vim.api.nvim_list_uis()[1]
@@ -312,7 +317,6 @@ function M.open(config)
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buffers_buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buffers_buf})
   vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buffers_buf})
-  vim.keymap.set("n", "q", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
 
   local buffers_win_config = {
     style = "minimal",
@@ -329,7 +333,12 @@ function M.open(config)
   vim.api.nvim_set_option_value("cursorline", true, {win = buffers_win})
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:BufhopperCursorLine", {win = buffers_win})
 
+  vim.keymap.set("n", "q", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
+  vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
   for i, buffer_key in ipairs(buffer_keys) do
+    if buffer_key.buf == current_buf then
+      vim.api.nvim_win_set_cursor(buffers_win, {i, 0})
+    end
     -- pcall(
     --   vim.keymap.del,
     --   "n",
@@ -380,6 +389,21 @@ function M.open(config)
       )
     end,
     {silent = true, buffer = buffers_buf}
+  )
+  vim.keymap.set(
+    "n",
+    "<cr>",
+    function()
+      local cursor_pos = vim.api.nvim_win_get_cursor(buffers_win)
+      local buffer_idx = cursor_pos[1]
+      ---@type BufferKeyMapping | nil
+      local buffer_key = buffer_keys[buffer_idx]
+      if buffer_key ~= nil then
+        M.close()
+        vim.api.nvim_set_current_buf(buffer_key.buf)
+      end
+    end,
+    {silent = true, remap = false, buffer = buffers_buf}
   )
   vim.keymap.set(
     "n",
