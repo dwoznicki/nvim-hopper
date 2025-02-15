@@ -28,11 +28,11 @@ end
 ---@param num_buffer_rows integer
 ---@return integer, integer
 local function get_win_dimensions(ui, num_buffer_rows)
-  local available_width = math.ceil(ui.width * 0.4)
+  local available_width = math.ceil(ui.width * 0.5)
   local available_height = ui.height - 6
   -- For buffer list height, we'll try and choose a reasonable height without going over the
   -- available remaining space.
-  local buffers_height = math.max(math.min(num_buffer_rows, available_height), 10)
+  local buffers_height = math.max(math.min(num_buffer_rows, available_height), 20)
   return buffers_height, available_width
 end
 
@@ -56,17 +56,6 @@ local function get_buffers_win_column_widths(win_width)
   -- Any available space can be given to file path.
   local file_path_col_width = math.max(available_width - 1, 0)
   return key_col_width, file_path_col_width, indicators_col_width
-end
-
----@param keymap string
----@return string
-local function get_first_key(keymap)
-  local special_key_pattern = "^<%a+>"
-  local first_key = keymap:match(special_key_pattern)
-  if first_key then
-    return first_key
-  end
-  return keymap:sub(1, 1)
 end
 
 ---@param config BufhopperConfig
@@ -223,7 +212,9 @@ local function draw_buffer_lines(buf, buffer_keys, win_width)
           text_width = text_width + 1
         end
         if remaining_file_path_width - text_width < 0 then
-          display_path_tokens[j - 1] = "…"
+          -- We've reached the hard limit on horizontal space. There's not even enough room for the
+          -- ellipsis, so remove the previous path token to make room.
+          table.remove(display_path_tokens, j - 1)
           break
         end
       end
@@ -289,12 +280,23 @@ local function draw_buffer_lines(buf, buffer_keys, win_width)
   vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
 end
 
+---@param buffer_keys table<BufferKeyMapping>
+---@param win integer
+---@return BufferKeyMapping | nil, integer
+local function get_buffer_key_under_cursor(buffer_keys, win)
+  local cursor_pos = vim.api.nvim_win_get_cursor(win)
+  local buffer_idx = cursor_pos[1]
+  ---@type BufferKeyMapping | nil
+  local buffer_key = buffer_keys[buffer_idx]
+  return buffer_key, buffer_idx
+end
 
 ---Open the floating window.
 ---@param config? BufhopperConfig
 function M.open(config)
   if M._buffers_win and vim.api.nvim_win_is_valid(M._buffers_win) then
     -- The float is already open.
+    vim.api.nvim_set_current_win(M._buffers_win)
     return
   end
   if config == nil then
@@ -318,12 +320,15 @@ function M.open(config)
   vim.api.nvim_set_option_value("swapfile", false, {buf = buffers_buf})
   vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buffers_buf})
 
+  local keypress_mode = "open"
+
   local buffers_win_config = {
     style = "minimal",
     relative = "editor",
     width = win_width,
-    height = buffers_height,
-    row = math.floor((ui.height - buffers_height) * 0.5) - 1,
+    -- height = buffers_height,
+    height = 10,
+    row = 3,
     col = math.floor((ui.width - win_width) * 0.5),
     title = " Buffers ",
     title_pos = "center",
@@ -332,9 +337,29 @@ function M.open(config)
   local buffers_win = vim.api.nvim_open_win(buffers_buf, true, buffers_win_config)
   vim.api.nvim_set_option_value("cursorline", true, {win = buffers_win})
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:BufhopperCursorLine", {win = buffers_win})
+  -- vim.api.nvim_set_option_value("
 
-  vim.keymap.set("n", "q", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
-  vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, buffer = buffers_buf})
+  vim.keymap.set("n", "q", ":q<cr>", {noremap = true, silent = true, nowait = true, buffer = buffers_buf})
+  vim.keymap.set("n", "<esc>", ":q<cr>", {noremap = true, silent = true, nowait = true, buffer = buffers_buf})
+
+  -- -- local keymaps = vim.api.nvim_buf_get_keymap(buffers_buf, "n")
+  -- local keymaps = vim.api.nvim_get_keymap("n")
+  -- ---@type table<string, table<string>>
+  -- local keymappings_by_first_key = {}
+  -- for _, keymapping in ipairs(keymaps) do
+  --   local first_key = keymapping.lhs:sub(1, 1)
+  --   if first_key == "<" then
+  --     local special_key = keymapping.lhs:match("^(<[^>]+>)")
+  --     if special_key then
+  --       first_key = special_key
+  --     end
+  --   end
+  --   if keymappings_by_first_key[first_key] == nil then
+  --     keymappings_by_first_key[first_key] = {}
+  --   end
+  --   table.insert(keymappings_by_first_key[first_key], keymapping.lhs)
+  -- end
+
   for i, buffer_key in ipairs(buffer_keys) do
     if buffer_key.buf == current_buf then
       vim.api.nvim_win_set_cursor(buffers_win, {i, 0})
@@ -345,6 +370,22 @@ function M.open(config)
     --   buffer_key.key,
     --   {buffer = M._buffers_buf}
     -- )
+
+    -- local conflicting_keymappings = keymappings_by_first_key[buffer_key.key]
+    -- if conflicting_keymappings ~= nil then
+    --   for _, keymapping_lhs in ipairs(conflicting_keymappings) do
+    --     if string.len(keymapping_lhs) > 1 then
+    --       vim.print("masking", keymapping_lhs)
+    --       vim.keymap.set(
+    --         "n",
+    --         keymapping_lhs,
+    --         "<Nop>",
+    --         {noremap = true, silent = true, buffer = buffers_buf}
+    --       )
+    --     end
+    --   end
+    -- end
+
     vim.keymap.set(
       "n",
       buffer_key.key,
@@ -361,7 +402,7 @@ function M.open(config)
           return
         end
       end,
-      {noremap = true, silent = true, buffer = buffers_buf}
+      {noremap = true, silent = true, nowait = true, buffer = buffers_buf}
     )
   end
   vim.keymap.set(
@@ -375,7 +416,7 @@ function M.open(config)
         false
       )
     end,
-    {silent = true, buffer = buffers_buf}
+    {silent = true, nowait = true, buffer = buffers_buf}
   )
   vim.keymap.set(
     "n",
@@ -388,43 +429,72 @@ function M.open(config)
         false
       )
     end,
-    {silent = true, buffer = buffers_buf}
+    {silent = true, nowait = true, buffer = buffers_buf}
   )
   vim.keymap.set(
     "n",
     "<cr>",
     function()
-      local cursor_pos = vim.api.nvim_win_get_cursor(buffers_win)
-      local buffer_idx = cursor_pos[1]
-      ---@type BufferKeyMapping | nil
-      local buffer_key = buffer_keys[buffer_idx]
+      local buffer_key, _ = get_buffer_key_under_cursor(buffer_keys, buffers_win)
       if buffer_key ~= nil then
         M.close()
         vim.api.nvim_set_current_buf(buffer_key.buf)
       end
     end,
-    {silent = true, remap = false, buffer = buffers_buf}
+    {silent = true, remap = false, nowait = true, buffer = buffers_buf}
   )
   vim.keymap.set(
     "n",
     "dd",
     function()
-      local cursor_pos = vim.api.nvim_win_get_cursor(buffers_win)
-      local buffer_idx = cursor_pos[1]
-      ---@type BufferKeyMapping | nil
-      local buffer_key = buffer_keys[buffer_idx]
+      local buffer_key, idx = get_buffer_key_under_cursor(buffer_keys, buffers_win)
       if buffer_key ~= nil then
         vim.api.nvim_buf_delete(buffer_key.buf, {})
-        table.remove(buffer_keys, buffer_idx)
+        table.remove(buffer_keys, idx)
         draw_buffer_lines(buffers_buf, buffer_keys)
       end
     end,
-    {silent = true, buffer = buffers_buf}
+    {silent = true, nowait = true, buffer = buffers_buf}
+  )
+  vim.keymap.set(
+    "n",
+    "H",
+    function()
+      local buffer_key, _ = get_buffer_key_under_cursor(buffer_keys, buffers_win)
+      if buffer_key ~= nil then
+        vim.cmd("split")
+        local split_win = vim.api.nvim_get_current_win()
+        vim.api.nvim_win_set_buf(split_win, buffer_key.buf)
+      end
+    end,
+    {silent = true, nowait = true, buffer = buffers_buf}
+  )
+  vim.keymap.set(
+    "n",
+    "V",
+    function()
+      local buffer_key, _ = get_buffer_key_under_cursor(buffer_keys, buffers_win)
+      if buffer_key ~= nil then
+        vim.cmd("vsplit")
+        local split_win = vim.api.nvim_get_current_win()
+        vim.api.nvim_win_set_buf(split_win, buffer_key.buf)
+      end
+    end,
+    {silent = true, nowait = true, buffer = buffers_buf}
   )
 
   M._buffers_buf = buffers_buf
   M._buffers_win = buffers_win
-  M._keypress_mode = "open"
+  M._keypress_mode = keypress_mode
+
+  -- Close the float when the cursor leaves.
+  vim.api.nvim_create_autocmd("WinLeave", {
+    buffer = buffers_buf,
+    once = true,
+    callback = function()
+      M.close()
+    end,
+  })
 
   vim.api.nvim_create_autocmd("BufWipeout", {
     buffer = buffers_buf,
