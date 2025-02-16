@@ -1,15 +1,15 @@
-local actions = require("bufhopper.actions")
+local Actions = require("bufhopper.actions")
 
 local M = {}
 
 local function handle_command(opts)
   local subcommand = opts.fargs[1]
   if subcommand == "open" then
-    actions.open(M.config)
+    Actions.open()
   elseif subcommand == "close" then
-    actions.close()
+    Actions.close()
   elseif subcommand == "delete_other_buffers" then
-    actions.delete_other_buffers()
+    Actions.delete_other_buffers()
   else
     print("Unrecognized subcommand: " .. (subcommand or "nil"))
   end
@@ -24,9 +24,7 @@ local function complete_subcommand(_, _, _)
 end
 
 ---Setup ex commands. 
----@param config BufhopperConfig
-M.setup = function(config)
-  M.config = config
+M.setup = function()
   vim.api.nvim_create_user_command(
     "Bufhopper",
     handle_command,

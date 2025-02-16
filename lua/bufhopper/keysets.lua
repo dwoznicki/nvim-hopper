@@ -1,29 +1,20 @@
 local M = {}
 
----@class NextKeyContext
----@field config BufhopperConfig
----@field mapped_keys table<string, integer>
----@field keyset string[]
----@field prev_key string | nil
----@field key_index integer
----@field file_name string
-local NextKeyContext = {}
-
----@param config BufhopperConfig
+---@param keyset BufhopperConfigState.keyset
 ---@return string[]
-M.determine_keyset = function(config)
-  if type(config.keyset) == "string" and M[config.keyset] ~= nil then
-    return M[config.keyset]
+M.determine_keyset = function(keyset)
+  if type(keyset) == "string" and M[keyset] ~= nil then
+    return M[keyset]
   end
-  if type(config.keyset) == "table" then
+  if type(keyset) == "table" then
     ---@diagnostic disable-next-line: return-type-mismatch
-    return config.keyset
+    return keyset
   end
   -- Just pick a reasonable default.
   return M.ergonomic
 end
 
----@param context NextKeyContext
+---@param context BufhopperNextKeyContext
 ---@return string | nil
 M.next_key_sequential = function(context)
   local key
@@ -43,7 +34,7 @@ M.next_key_sequential = function(context)
   return key
 end
 
----@param context NextKeyContext
+---@param context BufhopperNextKeyContext
 ---@return string | nil
 M.next_key_filename = function(context)
   local key
