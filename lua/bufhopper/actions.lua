@@ -1,32 +1,40 @@
-local Float = require("bufhopper.float")
-local Buflist = require("bufhopper.buflist")
-local Mode = require("bufhopper.mode")
+local state = require("bufhopper.state")
+local bl = require("bufhopper.buffer_list")
+local fw = require("bufhopper.floating_window")
 
 local M = {}
 
 ---Open the floating window.
 function M.open()
-  if Float.is_open() then
-    vim.api.nvim_set_current_win(Float.get_win())
+  if state.current.float ~= nil and state.current.float:is_open() then
+    vim.api.nvim_set_current_win(state.current.float.win)
     return
   end
-
-
-  Buflist.populate_buf_keys()
-  Buflist.setup_buf()
-  Buflist.draw()
-  Float.open_win(Buflist.get_buf())
-  Mode.set_mode("open")
 
   -- The buffer that we were on before opening the float.
   local current_buf = vim.api.nvim_get_current_buf()
 
-  for i, buffer_key in ipairs(Buflist.state.buf_keys) do
-    if buffer_key.buf == current_buf then
-      vim.api.nvim_win_set_cursor(Float.get_win(), {i, 0})
-      break
-    end
-  end
+  local buflist = bl.BufferList.new()
+  state.set_buflist(buflist)
+  buflist:populate_key_mappings()
+  buflist:draw()
+  local float = fw.FloatingWindow.new()
+  state.set_float(float)
+  float:open()
+  buflist:cursor_to_buf(current_buf)
+  state.get_mode_manager():set_mode(state.get_config().default_mode)
+
+  -- local buflist_buf = Buflist.create_buf()
+  -- State.state.buflist_buf = buflist_buf
+  -- local buf_keys = Buflist.get_buf_keys(State.get_config())
+  -- State.state.buflist_buf_keys = buf_keys
+  -- local ui = vim.api.nvim_list_uis()[1]
+  -- local _, win_width = Float.get_win_dimensions(ui, #buf_keys)
+  -- Buflist.draw(buflist_buf, buf_keys, win_width)
+  -- local float_win = Float.create_win(buflist_buf, ui)
+  -- State.state.float_win = float_win
+  -- Mode.set_mode("open")
+
 
   -- vim.keymap.set(
   --   "n",
@@ -56,29 +64,31 @@ function M.open()
   --   {silent = true, nowait = true, buffer = buffers_buf}
   -- )
 
-  -- Close the float when the cursor leaves.
-  vim.api.nvim_create_autocmd("WinLeave", {
-    buffer = Buflist.get_buf(),
-    once = true,
-    callback = function()
-      M.close()
-    end,
-  })
+  -- -- Close the float when the cursor leaves.
+  -- vim.api.nvim_create_autocmd("WinLeave", {
+  --   buffer = buflist_buf,
+  --   once = true,
+  --   callback = function()
+  --     M.close()
+  --   end,
+  -- })
 
-  vim.api.nvim_create_autocmd("BufWipeout", {
-    buffer = Buflist.get_buf(),
-    callback = function()
-      Float.state.win = nil
-      Buflist.state.buf = nil
-      Buflist.state.buf_keys = {}
-    end,
-  })
+  -- vim.api.nvim_create_autocmd("BufWipeout", {
+  --   buffer = buflist_buf,
+  --   callback = function()
+  --     State.state.float_win = nil
+  --     State.state.buflist_buf = nil
+  --     State.state.buflist_buf_keys = {}
+  --   end,
+  -- })
+
 end
 
 function M.close()
-  if Float.state.win ~= nil and vim.api.nvim_win_is_valid(Float.state.win) then
-    vim.api.nvim_win_close(Float.state.win, true)
+  if state.current.float ~= nil or not state.current.float:is_open() then
+    return
   end
+  state.current.float:close()
 end
 
 function M.delete_other_buffers()

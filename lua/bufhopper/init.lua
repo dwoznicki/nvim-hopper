@@ -1,20 +1,25 @@
-local Actions = require("bufhopper.actions")
-local Config = require("bufhopper.config")
+local actions = require("bufhopper.actions")
+local c = require("bufhopper.config")
+local state = require("bufhopper.state")
+local m = require("bufhopper.mode")
 
 local M = {}
 
 -- Re-export some command commands.
-M.open = Actions.open
-M.close = Actions.close
+M.open = actions.open
+M.close = actions.close
 
 ---Setup Bufhopper.
 ---@param options? BufhopperOptions
-M.setup = function(options)
+function M.setup(options)
+  local config = c.default_config()
   if options ~= nil then
-    Config.state = vim.tbl_extend("force", Config.default_config(), options)
+    config = vim.tbl_extend("force", config, options)
   end
+  state.set_config(config)
   require("bufhopper.highlight").setup()
   require("bufhopper.usercommand").setup()
+  state.set_mode_manager(m.ModeManager.new())
 end
 
 return M

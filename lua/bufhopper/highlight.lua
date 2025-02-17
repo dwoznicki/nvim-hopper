@@ -21,7 +21,7 @@ local function set_highlights()
   end
 end
 
-M.setup = function()
+function M.setup()
   vim.api.nvim_create_autocmd("ColorScheme", {
     pattern = "*",
     callback = set_highlights,

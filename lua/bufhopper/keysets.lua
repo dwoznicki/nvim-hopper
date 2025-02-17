@@ -1,8 +1,8 @@
 local M = {}
 
----@param keyset BufhopperConfigState.keyset
+---@param keyset BufhopperConfig.keyset
 ---@return string[]
-M.determine_keyset = function(keyset)
+function M.determine_keyset(keyset)
   if type(keyset) == "string" and M[keyset] ~= nil then
     return M[keyset]
   end
@@ -16,7 +16,7 @@ end
 
 ---@param context BufhopperNextKeyContext
 ---@return string | nil
-M.next_key_sequential = function(context)
+function M.next_key_sequential(context)
   local key
   for _ = 1, 100 do
     key = context.keyset[context.key_index]
@@ -36,7 +36,7 @@ end
 
 ---@param context BufhopperNextKeyContext
 ---@return string | nil
-M.next_key_filename = function(context)
+function M.next_key_filename(context)
   local key
   for i = 1, string.len(context.file_name) do
     key = string.sub(context.file_name, i, i)
