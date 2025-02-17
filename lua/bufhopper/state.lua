@@ -6,6 +6,7 @@ local M = {}
 ---@field config BufhopperConfig | nil
 ---@field float BufhopperFloatingWindow | nil
 ---@field buflist BufhopperBufferList | nil
+---@field statline BufhopperStatusLine | nil
 ---@field mode_manager BufhopperModeManager | nil
 
 ---@type BufhopperState
@@ -13,6 +14,7 @@ M.current = {
   config = nil,
   float = nil,
   buflist = nil,
+  statline = nil,
   mode_manager = nil,
 }
 ---@return BufhopperConfig
@@ -61,6 +63,20 @@ end
 function M.clear_buflist()
   M.current.buflist = nil
 end
+
+---@return BufhopperStatusLine
+function M.get_statline()
+  if M.current.statline == nil then
+    error("Bufhopper status line not set.")
+  end
+  return M.current.statline
+end
+
+---@param statline BufhopperStatusLine
+function M.set_statline(statline)
+  M.current.statline = statline
+end
+
 
 ---@return BufhopperModeManager
 function M.get_mode_manager()

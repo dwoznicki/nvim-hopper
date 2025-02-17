@@ -10,8 +10,9 @@ local function set_highlights()
   vim.api.nvim_set_hl(0, "BufhopperKey", {fg = "#f0a5c7"})
   vim.api.nvim_set_hl(0, "BufhopperCursorLine", {bg = "#343434"})
   if has_theme_kanagawa then
-    vim.api.nvim_set_hl(0, "BufhopperFooterModeOpen", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.springGreen})
-    vim.api.nvim_set_hl(0, "BufhopperFooterModeJump", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.springBlue})
+    vim.api.nvim_set_hl(0, "BufhopperModeOpen", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.springGreen})
+    vim.api.nvim_set_hl(0, "BufhopperModeJump", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.springBlue})
+    vim.api.nvim_set_hl(0, "BufhopperModeDelete", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.autumnRed})
   end
   if vim.o.background == "dark" then
     vim.api.nvim_set_hl(0, "BufhopperFileName", {fg = "#fdfd96"})

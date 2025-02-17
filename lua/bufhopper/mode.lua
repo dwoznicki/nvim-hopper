@@ -17,6 +17,16 @@ ModeManager.__index = ModeManager
 function ModeManager.new()
   local mode_manager = {}
   setmetatable(mode_manager, ModeManager)
+  vim.api.nvim_create_autocmd("User", {
+    pattern = "BufhopperModeChanged",
+    callback = function()
+      vim.schedule(
+        function()
+          state.get_statline():draw()
+        end
+      )
+    end,
+  })
   return mode_manager
 end
 
@@ -24,6 +34,13 @@ function ModeManager:set_mode(mode)
   self:teardown()
   self.mode = mode
   self:setup()
+  vim.api.nvim_exec_autocmds("User", {
+    pattern = "BufhopperModeChanged",
+    data = {
+      mode = mode,
+    },
+  })
+
   -- if mode ~= "jump" then
   --   vim.keymap.set(
   --     "n",
@@ -64,13 +81,12 @@ end
 
 function ModeManager:add_buflist_jump_keymappings()
   local buflist = state.get_buflist()
-  local float = state.get_float()
   for i, buf_key in ipairs(buflist.buf_keys) do
     vim.keymap.set(
       "n",
       buf_key.key,
       function()
-        vim.api.nvim_win_set_cursor(float.win, {i, 0})
+        vim.api.nvim_win_set_cursor(buflist.win, {i, 0})
         if self.mode == "open" then
           vim.defer_fn(
             function()
@@ -101,12 +117,11 @@ end
 
 function ModeManager:add_buflist_select_keymappings()
   local buflist = state.get_buflist()
-  local float = state.get_float()
   vim.keymap.set(
     "n",
     "<cr>",
     function()
-      local buf_key, _ = utils.get_buf_key_under_cursor(float.win, buflist.buf_keys)
+      local buf_key, _ = utils.get_buf_key_under_cursor(buflist.win, buflist.buf_keys)
       if buf_key ~= nil then
         state.get_float():close()
         vim.api.nvim_set_current_buf(buf_key.buf)
@@ -118,7 +133,7 @@ function ModeManager:add_buflist_select_keymappings()
     "n",
     "H",
     function()
-      local buf_key, _ = utils.get_buf_key_under_cursor(float.win, buflist.buf_keys)
+      local buf_key, _ = utils.get_buf_key_under_cursor(buflist.win, buflist.buf_keys)
       if buf_key ~= nil then
         vim.cmd("split")
         local split_win = vim.api.nvim_get_current_win()
@@ -131,7 +146,7 @@ function ModeManager:add_buflist_select_keymappings()
     "n",
     "V",
     function()
-      local buf_key, _ = utils.get_buffer_key_under_cursor(float.win, buflist.buf_keys)
+      local buf_key, _ = utils.get_buffer_key_under_cursor(buflist.win, buflist.buf_keys)
       if buf_key ~= nil then
         vim.cmd("vsplit")
         local split_win = vim.api.nvim_get_current_win()
@@ -191,15 +206,15 @@ function ModeManager:add_enter_delete_mode_keymapping()
     "n",
     "d",
     function()
-      M.set_mode("delete")
-      vim.o.operatorfunc = "v:lua.BufhopperDeleteOperator"
+      self:set_mode("delete")
+      vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
       return "g@"
     end,
     {expr = true, noremap = true, buffer = buflist.buf}
   )
 end
 
-function _G.BufhopperDeleteOperator()
+function _G.bufhopper_delete_operator()
   local buf = vim.api.nvim_get_current_buf()
   local start_mark = vim.api.nvim_buf_get_mark(buf, "[")
   local end_mark   = vim.api.nvim_buf_get_mark(buf, "]")

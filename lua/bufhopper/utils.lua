@@ -22,7 +22,7 @@ function M.get_win_dimensions(num_buffer_rows)
   -- For buffer list height, we'll try and choose a reasonable height without going over the
   -- available remaining space.
   local buffers_height = math.max(math.min(num_buffer_rows, available_height), 20)
-  return buffers_height, available_width
+  return 16, available_width
 end
 
 return M
