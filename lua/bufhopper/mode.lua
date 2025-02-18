@@ -8,7 +8,7 @@ local M = {}
 ---@class BufhopperModeManager
 ---@field mode BufhopperMode | nil
 ---@field prev_mode BufhopperMode | nil
----@field new fun(): BufhopperModeManager
+---@field create fun(): BufhopperModeManager
 ---@field set_mode fun(self: BufhopperModeManager, mode: BufhopperMode): nil
 ---@field revert_mode fun(self: BufhopperModeManager): nil
 ---@field setup fun(self: BufhopperModeManager): nil
@@ -16,19 +16,10 @@ local M = {}
 local ModeManager = {}
 ModeManager.__index = ModeManager
 
-function ModeManager.new()
+function ModeManager.create()
   local mode_manager = {}
   setmetatable(mode_manager, ModeManager)
-  vim.api.nvim_create_autocmd("User", {
-    pattern = "BufhopperModeChanged",
-    callback = function()
-      vim.schedule(
-        function()
-          state.get_status_line():draw()
-        end
-      )
-    end,
-  })
+  state.set_mode_manager(mode_manager)
   return mode_manager
 end
 
@@ -37,12 +28,11 @@ function ModeManager:set_mode(mode)
   self.prev_mode = self.mode
   self.mode = mode
   self:setup()
-  vim.api.nvim_exec_autocmds("User", {
-    pattern = "BufhopperModeChanged",
-    data = {
-      mode = mode,
-    },
-  })
+  vim.schedule(
+    function()
+      state.get_status_line():draw()
+    end
+  )
 
   -- if mode ~= "jump" then
   --   vim.keymap.set(
@@ -228,15 +218,23 @@ function ModeManager:add_enter_delete_mode_keymapping()
 end
 
 function _G.bufhopper_delete_operator()
-  local buf = vim.api.nvim_get_current_buf()
-  local start_mark = vim.api.nvim_buf_get_mark(buf, "[")
-  local end_mark   = vim.api.nvim_buf_get_mark(buf, "]")
+  local buftable = state.get_buffer_table()
+  local start_mark = vim.api.nvim_buf_get_mark(buftable.buf, "[")
+  local end_mark   = vim.api.nvim_buf_get_mark(buftable.buf, "]")
   local is_linewise = start_mark[1] ~= end_mark[1]
   if is_linewise then
-    state.get_buffer_table()
+    local buflist = state.get_buffer_list()
+    local cursor_pos = vim.api.nvim_win_get_cursor(buftable.win)
+    buflist:remove_index_range(start_mark[1], end_mark[1])
+    state.get_buffer_table():draw()
+    if #buflist.buffers > 0 then
+      if cursor_pos[1] > #buflist.buffers then
+        cursor_pos[1] = cursor_pos[1] - 1
+      end
+      state.get_buffer_table():cursor_to_row(cursor_pos[1])
+    end
   end
   state.get_mode_manager():revert_mode()
-  -- vim.print(start_mark, end_mark, is_linewise, vim.v.operator)
 end
 
 function ModeManager:remove_enter_delete_mode_keymapping()

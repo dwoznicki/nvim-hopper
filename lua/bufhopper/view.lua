@@ -81,19 +81,20 @@ M.FloatingWindow = FloatingWindow
 ---@field attach fun(float: BufhopperFloatingWindow): BufhopperBufferTable
 ---@field draw fun(self: BufhopperBufferTable, options?: BufhopperBufferTableDrawOptions): nil
 ---@field cursor_to_buf fun(self: BufhopperBufferTable, buf: integer): nil
+---@field cursor_to_row fun(self: BufhopperBufferTable, row: integer): nil
 ---@field close fun(self: BufhopperBufferTable): nil
 local BufferTable = {}
 BufferTable.__index = BufferTable
 
 function BufferTable.attach(float)
-  local buflist = {}
-  setmetatable(buflist, BufferTable)
+  local buftable = {}
+  setmetatable(buftable, BufferTable)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
   vim.api.nvim_set_option_value("filetype", "bufhopperbuflist", {buf = buf})
-  buflist.buf = buf
+  buftable.buf = buf
   local win_height, win_width = utils.get_win_dimensions(0)
   ---@type vim.api.keyset.win_config
   local win_config = {
@@ -108,7 +109,7 @@ function BufferTable.attach(float)
     focusable = true,
   }
   local win = vim.api.nvim_open_win(buf, true, win_config)
-  buflist.win = win
+  buftable.win = win
   vim.api.nvim_set_option_value("cursorline", true, {win = win})
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:BufhopperCursorLine", {win = win})
   vim.keymap.set(
@@ -124,8 +125,8 @@ function BufferTable.attach(float)
       state.get_floating_window():close()
     end,
   })
-  state.set_buffer_table(buflist)
-  return buflist
+  state.set_buffer_table(buftable)
+  return buftable
 end
 
 
@@ -263,6 +264,10 @@ function BufferTable:cursor_to_buf(buf)
       break
     end
   end
+end
+
+function BufferTable:cursor_to_row(row)
+  vim.api.nvim_win_set_cursor(self.win, {row, 0})
 end
 
 function BufferTable:close()

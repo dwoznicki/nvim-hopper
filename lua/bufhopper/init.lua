@@ -19,7 +19,7 @@ function M.setup(options)
   state.set_config(config)
   require("bufhopper.highlight").setup()
   require("bufhopper.usercommand").setup()
-  state.set_mode_manager(m.ModeManager.new())
+  m.ModeManager.create()
 end
 
 return M
