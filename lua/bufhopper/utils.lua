@@ -3,13 +3,13 @@
 local M = {}
 
 ---@param win integer
----@param buf_keys BufhopperBufferKeymapping[]
----@return BufhopperBufferKeymapping | nil, integer
-function M.get_buf_key_under_cursor(win, buf_keys)
+---@param buffers BufhopperBuffer[]
+---@return BufhopperBuffer | nil, integer
+function M.get_buf_key_under_cursor(win, buffers)
   local cursor_pos = vim.api.nvim_win_get_cursor(win)
   local buffer_idx = cursor_pos[1]
-  ---@type BufhopperBufferKeymapping | nil
-  local buf_key = buf_keys[buffer_idx]
+  ---@type BufhopperBuffer | nil
+  local buf_key = buffers[buffer_idx]
   return buf_key, buffer_idx
 end
 

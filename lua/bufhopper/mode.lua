@@ -7,8 +7,10 @@ local M = {}
 
 ---@class BufhopperModeManager
 ---@field mode BufhopperMode | nil
+---@field prev_mode BufhopperMode | nil
 ---@field new fun(): BufhopperModeManager
 ---@field set_mode fun(self: BufhopperModeManager, mode: BufhopperMode): nil
+---@field revert_mode fun(self: BufhopperModeManager): nil
 ---@field setup fun(self: BufhopperModeManager): nil
 ---@field teardown fun(self: BufhopperModeManager): nil
 local ModeManager = {}
@@ -22,7 +24,7 @@ function ModeManager.new()
     callback = function()
       vim.schedule(
         function()
-          state.get_statline():draw()
+          state.get_status_line():draw()
         end
       )
     end,
@@ -32,6 +34,7 @@ end
 
 function ModeManager:set_mode(mode)
   self:teardown()
+  self.prev_mode = self.mode
   self.mode = mode
   self:setup()
   vim.api.nvim_exec_autocmds("User", {
@@ -51,6 +54,11 @@ function ModeManager:set_mode(mode)
   --     {silent = true, nowait = true, buffer = State.get_buflist_buf()}
   --   )
   -- end
+
+end
+
+function ModeManager:revert_mode()
+  self:set_mode(self.prev_mode)
 end
 
 function ModeManager:setup()
@@ -63,6 +71,7 @@ function ModeManager:setup()
     self:add_jk_escape_hatch_keymappings()
     self:add_enter_delete_mode_keymapping()
   elseif self.mode == "delete" then
+    self:add_cancel_keymapping()
   end
 end
 
@@ -76,96 +85,100 @@ function ModeManager:teardown()
     self:remove_jk_escape_hatch_keymappings()
     self:remove_enter_delete_mode_keymapping()
   elseif self.mode == "delete" then
+    self:remove_cancel_keymapping()
   end
 end
 
 function ModeManager:add_buflist_jump_keymappings()
-  local buflist = state.get_buflist()
-  for i, buf_key in ipairs(buflist.buf_keys) do
+  local buftable = state.get_buffer_table()
+  local buffers = state.get_buffer_list().buffers
+  for i, buffer in ipairs(buffers) do
     vim.keymap.set(
       "n",
-      buf_key.key,
+      buffer.key,
       function()
-        vim.api.nvim_win_set_cursor(buflist.win, {i, 0})
+        vim.api.nvim_win_set_cursor(buftable.win, {i, 0})
         if self.mode == "open" then
           vim.defer_fn(
             function()
-              state.get_float():close()
-              vim.api.nvim_set_current_buf(buf_key.buf)
+              state.get_floating_window():close()
+              vim.api.nvim_set_current_buf(buffer.buf)
             end,
             50
           )
           return
         end
       end,
-      {noremap = true, silent = true, nowait = true, buffer = buflist.buf}
+      {noremap = true, silent = true, nowait = true, buffer = buftable.buf}
     )
   end
 end
 
 function ModeManager:remove_buflist_jump_keymappings()
-  local buflist = state.get_buflist()
-  for _, buf_key in ipairs(buflist.buf_keys) do
+  local buftable = state.get_buffer_table()
+  local buffers = state.get_buffer_list().buffers
+  for _, buffer in ipairs(buffers) do
     pcall(
       vim.keymap.del,
       "n",
-      buf_key.key,
-      {buffer = buflist.buf}
+      buffer.key,
+      {buffer = buftable.buf}
     )
   end
 end
 
 function ModeManager:add_buflist_select_keymappings()
-  local buflist = state.get_buflist()
+  local buftable = state.get_buffer_table()
+  local buffers = state.get_buffer_list().buffers
   vim.keymap.set(
     "n",
     "<cr>",
     function()
-      local buf_key, _ = utils.get_buf_key_under_cursor(buflist.win, buflist.buf_keys)
+      local buf_key, _ = utils.get_buf_key_under_cursor(buftable.win, buffers)
       if buf_key ~= nil then
-        state.get_float():close()
+        state.get_floating_window():close()
         vim.api.nvim_set_current_buf(buf_key.buf)
       end
     end,
-    {silent = true, remap = false, nowait = true, buffer = buflist.buf}
+    {silent = true, remap = false, nowait = true, buffer = buftable.buf}
   )
   vim.keymap.set(
     "n",
     "H",
     function()
-      local buf_key, _ = utils.get_buf_key_under_cursor(buflist.win, buflist.buf_keys)
+      local buf_key, _ = utils.get_buf_key_under_cursor(buftable.win, buffers)
       if buf_key ~= nil then
         vim.cmd("split")
         local split_win = vim.api.nvim_get_current_win()
         vim.api.nvim_win_set_buf(split_win, buf_key.buf)
       end
     end,
-    {silent = true, nowait = true, buffer = buflist.buf}
+    {silent = true, nowait = true, buffer = buftable.buf}
   )
   vim.keymap.set(
     "n",
     "V",
     function()
-      local buf_key, _ = utils.get_buffer_key_under_cursor(buflist.win, buflist.buf_keys)
+      local buf_key, _ = utils.get_buffer_key_under_cursor(buftable.win, buffers)
       if buf_key ~= nil then
         vim.cmd("vsplit")
         local split_win = vim.api.nvim_get_current_win()
         vim.api.nvim_win_set_buf(split_win, buf_key.buf)
       end
     end,
-    {silent = true, nowait = true, buffer = buflist.buf}
+    {silent = true, nowait = true, buffer = buftable.buf}
   )
 end
 
 function ModeManager:remove_buflist_select_keymappings()
-  local buflist = state.get_buflist()
-  pcall(vim.keymap.del, "n", "<cr>", {buffer = buflist.buf})
-  pcall(vim.keymap.del, "n", "H", {buffer = buflist.buf})
-  pcall(vim.keymap.del, "n", "V", {buffer = buflist.buf})
+  local buftable = state.get_buffer_table()
+  pcall(vim.keymap.del, "n", "<cr>", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "n", "H", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "n", "V", {buffer = buftable.buf})
 end
 
 function ModeManager:add_jk_escape_hatch_keymappings()
-  local buflist = state.get_buflist()
+  local buftable = state.get_buffer_table()
   vim.keymap.set(
     "n",
     "j",
@@ -177,7 +190,7 @@ function ModeManager:add_jk_escape_hatch_keymappings()
         false
       )
     end,
-    {silent = true, nowait = true, buffer = buflist.buf}
+    {silent = true, nowait = true, buffer = buftable.buf}
   )
   vim.keymap.set(
     "n",
@@ -190,18 +203,18 @@ function ModeManager:add_jk_escape_hatch_keymappings()
         false
       )
     end,
-    {silent = true, nowait = true, buffer = buflist.buf}
+    {silent = true, nowait = true, buffer = buftable.buf}
   )
 end
 
 function ModeManager:remove_jk_escape_hatch_keymappings()
-  local buflist = state.get_buflist()
-  pcall(vim.keymap.del, "n", "j", {buffer = buflist.buf})
-  pcall(vim.keymap.del, "n", "k", {buffer = buflist.buf})
+  local buftable = state.get_buffer_table()
+  pcall(vim.keymap.del, "n", "j", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "n", "k", {buffer = buftable.buf})
 end
 
 function ModeManager:add_enter_delete_mode_keymapping()
-  local buflist = state.get_buflist()
+  local buftable = state.get_buffer_table()
   vim.keymap.set(
     "n",
     "d",
@@ -210,7 +223,7 @@ function ModeManager:add_enter_delete_mode_keymapping()
       vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
       return "g@"
     end,
-    {expr = true, noremap = true, buffer = buflist.buf}
+    {expr = true, noremap = true, buffer = buftable.buf}
   )
 end
 
@@ -218,15 +231,36 @@ function _G.bufhopper_delete_operator()
   local buf = vim.api.nvim_get_current_buf()
   local start_mark = vim.api.nvim_buf_get_mark(buf, "[")
   local end_mark   = vim.api.nvim_buf_get_mark(buf, "]")
-  -- local is_linewise = (start_mark[2] == 1) and (end_mark[2] == 0 or end_mark[2] >= #end_line_text)
-  -- vim.print(is_linewise)
   local is_linewise = start_mark[1] ~= end_mark[1]
-  vim.print(start_mark, end_mark, is_linewise, vim.v.operator)
+  if is_linewise then
+    state.get_buffer_table()
+  end
+  state.get_mode_manager():revert_mode()
+  -- vim.print(start_mark, end_mark, is_linewise, vim.v.operator)
 end
 
 function ModeManager:remove_enter_delete_mode_keymapping()
-  local buflist = state.get_buflist()
-  pcall(vim.keymap.del, "n", "d", {buffer = buflist.buf})
+  local buftable = state.get_buffer_table()
+  pcall(vim.keymap.del, "n", "d", {buffer = buftable.buf})
+end
+
+function ModeManager:add_cancel_keymapping()
+  local buftable = state.get_buffer_table()
+  -- Cancel delete mode when the user presses escape.
+  vim.keymap.set(
+    {"o", "n"},
+    "<esc>",
+    function()
+      self:revert_mode()
+      return "<esc>"
+    end,
+    {expr = true, noremap = true, buffer = buftable.buf}
+  )
+end
+
+function ModeManager:remove_cancel_keymapping()
+  local buftable = state.get_buffer_table()
+  pcall(vim.keymap.del, {"o", "n"}, "<esc>", {buffer = buftable.buf})
 end
 
 M.ModeManager = ModeManager

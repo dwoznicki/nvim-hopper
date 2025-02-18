@@ -1,28 +1,93 @@
-local keysets = require("bufhopper.keysets")
-local filepath = require("bufhopper.filepath")
 local utils = require("bufhopper.utils")
 local state = require("bufhopper.state")
 
 local M = {}
 
----@class BufhopperBufferListDrawOptions
+---@class BufhopperFloatingWindow
+---@field win integer
+---@field buf integer
+---@field open fun(): BufhopperFloatingWindow
+---@field is_open fun(self: BufhopperFloatingWindow): boolean
+---@field focus fun(self: BufhopperFloatingWindow): nil
+---@field close fun(self: BufhopperFloatingWindow): nil
+local FloatingWindow = {}
+FloatingWindow.__index = FloatingWindow
+
+function FloatingWindow.open()
+  local float = {}
+  setmetatable(float, FloatingWindow)
+  local buf = vim.api.nvim_create_buf(false, true)
+  float.buf = buf
+  vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
+  vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
+  vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
+  vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buf})
+  local ui = vim.api.nvim_list_uis()[1]
+  local win_height, win_width = utils.get_win_dimensions(0)
+  ---@type vim.api.keyset.win_config
+  local win_config = {
+    style = "minimal",
+    relative = "editor",
+    width = win_width + 2, -- extra for borders
+    height = win_height + 2, -- extra for borders
+    row = 3,
+    col = math.floor((ui.width - win_width) * 0.5),
+    border = "none",
+    focusable = false,
+    -- title = " Buffers ",
+    -- title_pos = "center",
+    -- border = "rounded",
+  }
+  local win = vim.api.nvim_open_win(buf, false, win_config)
+  float.win = win
+
+  -- -- Close the float when the cursor leaves.
+  -- vim.api.nvim_create_autocmd("WinLeave", {
+  --   buffer = buf,
+  --   once = true,
+  --   callback = function()
+  --     self:close()
+  --   end,
+  -- })
+
+  state.set_floating_window(float)
+  return float
+end
+
+function FloatingWindow:is_open()
+  return self.win ~= nil and vim.api.nvim_win_is_valid(self.win)
+end
+
+function FloatingWindow:focus()
+  vim.api.nvim_set_current_win(state.get_buffer_table().win)
+end
+
+function FloatingWindow:close()
+  if vim.api.nvim_win_is_valid(self.win) then
+    vim.api.nvim_win_close(self.win, true)
+  end
+  state.get_buffer_table():close()
+  state.get_status_line():close()
+end
+
+M.FloatingWindow = FloatingWindow
+
+---@class BufhopperBufferTableDrawOptions
 ---@field hide_keymapping? boolean
 
----@class BufhopperBufferList
+---@class BufhopperBufferTable
 ---@field buf integer
 ---@field win integer
----@field buf_keys BufhopperBufferKeymapping[]
----@field attach fun(float: BufhopperFloatingWindow): BufhopperBufferList
----@field populate_key_mappings fun(self: BufhopperBufferList): nil
----@field draw fun(self: BufhopperBufferList, options?: BufhopperBufferListDrawOptions): nil
----@field cursor_to_buf fun(self: BufhopperBufferList, buf: integer): nil
----@field close fun(self: BufhopperBufferList): nil
-local BufferList = {}
-BufferList.__index = BufferList
+---@field attach fun(float: BufhopperFloatingWindow): BufhopperBufferTable
+---@field draw fun(self: BufhopperBufferTable, options?: BufhopperBufferTableDrawOptions): nil
+---@field cursor_to_buf fun(self: BufhopperBufferTable, buf: integer): nil
+---@field close fun(self: BufhopperBufferTable): nil
+local BufferTable = {}
+BufferTable.__index = BufferTable
 
-function BufferList.attach(float)
+function BufferTable.attach(float)
   local buflist = {}
-  setmetatable(buflist, BufferList)
+  setmetatable(buflist, BufferTable)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
@@ -56,90 +121,16 @@ function BufferList.attach(float)
     buffer = buf,
     once = true,
     callback = function()
-      state.get_float():close()
+      state.get_floating_window():close()
     end,
   })
-  state.set_buflist(buflist)
+  state.set_buffer_table(buflist)
   return buflist
 end
 
-function BufferList:populate_key_mappings()
-  local config = state.get_config()
-  ---@type BufhopperBufferKeymapping[]
-  local buf_keys = {}
-  local num_buffers = 0
 
-  local keyset = keysets.determine_keyset(config.keyset)
-  local prev_key = nil
-  ---@type function(context: BufhopperNextKeyContext): string | nil
-  local next_key_fn
-  if type(config.next_key) == "function" then
-    --- LuaLS gets this wrong.
-    ---@diagnostic disable-next-line: cast-local-type
-    next_key_fn = config.next_key
-  elseif config.next_key == "filename" then
-    next_key_fn = keysets.next_key_filename
-  else -- "sequential"
-    next_key_fn = keysets.next_key_sequential
-  end
-  ---@type table<string, integer>
-  local mapped_keys = {}
-  -- It's okay for functions to mutate this. In fact, it's necessary for the "sequential" algorithm.
-  ---@type BufhopperNextKeyContext
-  local next_key_context = {
-    config = config,
-    mapped_keys = mapped_keys,
-    keyset = keyset,
-    prev_key = prev_key,
-    key_index = 1,
-    file_name = "",
-  }
-
-  local current_buf = vim.api.nvim_get_current_buf()
-  local alternate_buf = vim.fn.bufnr('#')
-  for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
-    -- if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
-    if vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
-      goto continue
-    end
-    local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(openbuf))
-    local project_file_path_tokens = vim.split(project_file_path, "/")
-    local file_name = vim.fn.fnamemodify(project_file_path, ":t")
-    local buf_indicators = M.get_buffer_indicators(openbuf, current_buf, alternate_buf)
-    next_key_context.file_name = file_name
-    local key
-    for _ = 1, 40 do
-      key = next_key_fn(next_key_context)
-      if key ~= nil then
-        break
-      end
-    end
-    if key == nil then
-      break
-    end
-    next_key_context.prev_key = key
-    mapped_keys[key] = openbuf
-    table.insert(
-      buf_keys,
-      {
-        key = key,
-        buf = openbuf,
-        file_name = file_name,
-        file_path = project_file_path,
-        file_path_tokens = project_file_path_tokens,
-        buf_indicators = buf_indicators,
-      }
-    )
-    num_buffers = num_buffers + 1
-    ::continue::
-  end
-  table.sort(buf_keys, function(a, b)
-    return a.buf < b.buf
-  end)
-  self.buf_keys = buf_keys
-end
-
-function BufferList:draw(options)
+function BufferTable:draw(options)
+  local buffers = state.get_buffer_list().buffers
   options = options or {}
   local _, win_width = utils.get_win_dimensions(0)
   local _, file_path_col_width, _ = M.get_column_widths(win_width)
@@ -147,10 +138,10 @@ function BufferList:draw(options)
   ---@class TreeNode: table<string, TreeNode>
   local reverse_path_token_tree = {}
 
-  for _, buf_key in ipairs(self.buf_keys) do
+  for _, buffer in ipairs(buffers) do
     local curr_node = reverse_path_token_tree
-    for i = #buf_key.file_path_tokens, 1, -1 do
-      local path_token = buf_key.file_path_tokens[i]
+    for i = #buffer.file_path_tokens, 1, -1 do
+      local path_token = buffer.file_path_tokens[i]
       if curr_node[path_token] == nil then
         curr_node[path_token] = {}
       end
@@ -163,14 +154,14 @@ function BufferList:draw(options)
   ---@type {name: string, row: integer, col_start: integer, col_end: integer}[]
   local hl_locs = {}
 
-  for i, buf_key in ipairs(self.buf_keys) do
+  for i, buffer in ipairs(buffers) do
     local remaining_file_path_width = file_path_col_width
     ---@type string[]
     local display_path_tokens = {}
     local significant_path_length = 0
     local curr_node = reverse_path_token_tree
-    for j = #buf_key.file_path_tokens, 1, -1 do
-      local path_token = buf_key.file_path_tokens[j]
+    for j = #buffer.file_path_tokens, 1, -1 do
+      local path_token = buffer.file_path_tokens[j]
       local text_width = vim.fn.strdisplaywidth(path_token)
       if j ~= 1 then
         -- Account for leading dir separator.
@@ -197,8 +188,8 @@ function BufferList:draw(options)
       curr_node = curr_node[path_token]
     end
 
-    for j = 1, #buf_key.file_path_tokens - #display_path_tokens, 1 do
-      local path_token = buf_key.file_path_tokens[j]
+    for j = 1, #buffer.file_path_tokens - #display_path_tokens, 1 do
+      local path_token = buffer.file_path_tokens[j]
       local text_width = vim.fn.strdisplaywidth(path_token)
       if j ~= 1 then
         -- Account for leading dir separator.
@@ -237,12 +228,12 @@ function BufferList:draw(options)
       -- Maintain the space, but don't display the key.
       keymapping = " "
     else
-      keymapping = buf_key.key
+      keymapping = buffer.key
     end
 
     table.insert(
       buf_lines,
-      " " .. keymapping .. " " .. display_path .. " " .. buf_key.buf_indicators
+      " " .. keymapping .. " " .. display_path .. " " .. buffer.buf_indicators
     )
     local col_start, col_end = 1, 2
     table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
@@ -264,33 +255,96 @@ function BufferList:draw(options)
   vim.api.nvim_set_option_value("modifiable", false, {buf = self.buf})
 end
 
-function BufferList:cursor_to_buf(buf)
-  for i, buf_key in ipairs(self.buf_keys) do
-    if buf_key.buf == buf then
+function BufferTable:cursor_to_buf(buf)
+  local buffers = state.get_buffer_list().buffers
+  for i, buffer in ipairs(buffers) do
+    if buffer.buf == buf then
       vim.api.nvim_win_set_cursor(self.win, {i, 0})
       break
     end
   end
 end
 
-function BufferList:close()
+function BufferTable:close()
   vim.api.nvim_win_close(self.win, true)
 end
 
-M.BufferList = BufferList
+M.BufferTable = BufferTable
 
----@param buf integer
----@param current_buf integer
----@param alternate_buf integer
----@return string
-function M.get_buffer_indicators(buf, current_buf, alternate_buf)
-  local buf_info = vim.fn.getbufinfo(buf)[1]
-  local indicator1 = (buf == current_buf) and "%" or (buf== alternate_buf and "#" or " ")
-  local indicator2 = (#buf_info.windows > 0) and "a" or "h"
-  local mod_indicator = (buf_info.changed == 1) and "+" or " "
-  return indicator1 .. indicator2 .. mod_indicator
+---@class BufhopperStatusLine
+---@field buf integer
+---@field win integer
+---@field mode BufhopperMode | nil
+---@field attach fun(float: BufhopperFloatingWindow): BufhopperStatusLine
+---@field draw fun(self: BufhopperStatusLine): nil
+local StatusLine = {}
+StatusLine.__index = StatusLine
+
+function StatusLine.attach(float)
+  local statline = {}
+  setmetatable(statline, StatusLine)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
+  vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
+  vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
+  vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
+  vim.api.nvim_set_option_value("filetype", "bufhopperstatline", {buf = buf})
+  statline.buf = buf
+  local win_height, win_width = utils.get_win_dimensions(0)
+  ---@type vim.api.keyset.win_config
+  local win_config = {
+    style = "minimal",
+    relative = "win",
+    win = float.win,
+    width = win_width,
+    height = 1,
+    row = win_height,
+    col = 1,
+    border = "none",
+    focusable = false,
+  }
+  local win = vim.api.nvim_open_win(buf, false, win_config)
+  statline.win = win
+  state.set_status_line(statline)
+  return statline
 end
 
+function StatusLine:draw()
+  local mode = state.get_mode_manager().mode
+  ---@type {name: string, row: integer, col_start: integer, col_end: integer}[]
+  local hl_locs = {}
+  ---@type string[]
+  local buf_lines = {}
+  if mode == "jump" then
+    table.insert(buf_lines, "  Jump ")
+    table.insert(hl_locs, {name = "BufhopperModeJump", row = 0, col_start = 1, col_end = 7})
+  elseif mode == "open" then
+    table.insert(buf_lines, "  Open ")
+    table.insert(hl_locs, {name = "BufhopperModeOpen", row = 0, col_start = 1, col_end = 7})
+  elseif mode == "delete" then
+    table.insert(buf_lines, "  Delete ")
+    table.insert(hl_locs, {name = "BufhopperModeDelete", row = 0, col_start = 1, col_end = 9})
+  end
+
+  vim.api.nvim_set_option_value("modifiable", true, {buf = self.buf})
+  vim.api.nvim_buf_clear_namespace(self.buf, 0, 0, -1) -- clear highlights
+  vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, buf_lines) -- draw lines
+  for _, hl_loc in ipairs(hl_locs) do -- add highlights
+    vim.api.nvim_buf_add_highlight(self.buf, 0, hl_loc.name, hl_loc.row, hl_loc.col_start, hl_loc.col_end)
+  end
+  vim.api.nvim_set_option_value("modifiable", false, {buf = self.buf})
+  -- Force a redraw. This handles an issue where which-key stops the UI from updating until after
+  -- the delayed drawer opens.
+  vim.cmd("redraw")
+end
+
+function StatusLine:close()
+  if vim.api.nvim_win_is_valid(self.win) then
+    vim.api.nvim_win_close(self.win, true)
+  end
+end
+
+M.StatusLine = StatusLine
 ---@param win_width integer
 ---@return integer, integer, integer
 function M.get_column_widths(win_width)

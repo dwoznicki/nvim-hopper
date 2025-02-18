@@ -1,26 +1,25 @@
 local state = require("bufhopper.state")
-local bl = require("bufhopper.buffer_list")
-local fw = require("bufhopper.floating_window")
-local sl = require("bufhopper.status_line")
+local view = require("bufhopper.view")
+local buffer = require("bufhopper.buffer")
 
 local M = {}
 
 ---Open the floating window.
 function M.open()
-  if state.current.float ~= nil and state.current.float:is_open() then
-    state.current.float:focus()
+  if state.current.floating_window ~= nil and state.current.floating_window:is_open() then
+    state.current.floating_window:focus()
     return
   end
 
   -- The buffer that we were on before opening the float.
   local current_buf = vim.api.nvim_get_current_buf()
 
-  local float = fw.FloatingWindow.open()
-  local buflist = bl.BufferList.attach(float)
-  buflist:populate_key_mappings()
-  buflist:draw()
-  buflist:cursor_to_buf(current_buf)
-  local statline = sl.StatusLine.attach(float)
+  buffer.BufferList.create()
+  local float = view.FloatingWindow.open()
+  local buftable = view.BufferTable.attach(float)
+  buftable:draw()
+  buftable:cursor_to_buf(current_buf)
+  local statline = view.StatusLine.attach(float)
   state.get_mode_manager():set_mode(state.get_config().default_mode)
 
   -- local buflist_buf = Buflist.create_buf()
@@ -84,10 +83,10 @@ function M.open()
 end
 
 function M.close()
-  if state.current.float ~= nil or not state.current.float:is_open() then
+  if state.current.floating_window ~= nil or not state.current.floating_window:is_open() then
     return
   end
-  state.current.float:close()
+  state.current.floating_window:close()
 end
 
 function M.delete_other_buffers()
