@@ -129,10 +129,32 @@ M.BufferList = BufferList
 ---@return string
 function M.get_buffer_indicators(buf, current_buf, alternate_buf)
   local buf_info = vim.fn.getbufinfo(buf)[1]
-  local indicator1 = (buf == current_buf) and "%" or (buf== alternate_buf and "#" or " ")
-  local indicator2 = (#buf_info.windows > 0) and "a" or "h"
-  local mod_indicator = (buf_info.changed == 1) and "+" or " "
-  return indicator1 .. indicator2 .. mod_indicator
+  ---@type string
+  local ind1
+  if buf == current_buf then
+    ind1 = "%"
+  elseif buf == alternate_buf then
+    ind1 = "#"
+  else
+    ind1 = " "
+  end
+  ---@type string
+  local ind2
+  if #buf_info.windows > 0 then
+    ind2 = "a"
+  elseif buf_info.hidden == 1 then
+    ind2 = "h"
+  else
+    ind2 = " "
+  end
+  ---@type string
+  local ind3
+  if buf_info.changed == 1 then
+    ind3 = "+"
+  else
+    ind3 = " "
+  end
+  return ind1 .. ind2 .. ind3
 end
 
 return M
