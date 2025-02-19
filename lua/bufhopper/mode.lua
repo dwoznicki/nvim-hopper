@@ -211,6 +211,7 @@ function ModeManager:add_enter_delete_mode_keymapping()
     function()
       self:set_mode("delete")
       vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
+      vim.keymap.set("o", "d", "$", {noremap = true, buffer = buftable.buf})
       return "g@"
     end,
     {expr = true, noremap = true, buffer = buftable.buf}
@@ -220,19 +221,20 @@ end
 function _G.bufhopper_delete_operator()
   local buftable = state.get_buffer_table()
   local start_mark = vim.api.nvim_buf_get_mark(buftable.buf, "[")
-  local end_mark   = vim.api.nvim_buf_get_mark(buftable.buf, "]")
-  local is_linewise = start_mark[1] ~= end_mark[1]
-  if is_linewise then
-    local buflist = state.get_buffer_list()
-    local cursor_pos = vim.api.nvim_win_get_cursor(buftable.win)
+  local end_mark = vim.api.nvim_buf_get_mark(buftable.buf, "]")
+  local buflist = state.get_buffer_list()
+  local cursor_pos = vim.api.nvim_win_get_cursor(buftable.win)
+  if start_mark[1] == end_mark[1] then
+    buflist:remove_index(start_mark[1])
+  else
     buflist:remove_index_range(start_mark[1], end_mark[1])
-    state.get_buffer_table():draw()
-    if #buflist.buffers > 0 then
-      if cursor_pos[1] > #buflist.buffers then
-        cursor_pos[1] = cursor_pos[1] - 1
-      end
-      state.get_buffer_table():cursor_to_row(cursor_pos[1])
+  end
+  state.get_buffer_table():draw()
+  if #buflist.buffers > 0 then
+    if cursor_pos[1] > #buflist.buffers then
+      cursor_pos[1] = cursor_pos[1] - 1
     end
+    state.get_buffer_table():cursor_to_row(cursor_pos[1])
   end
   state.get_mode_manager():revert_mode()
 end
@@ -240,6 +242,7 @@ end
 function ModeManager:remove_enter_delete_mode_keymapping()
   local buftable = state.get_buffer_table()
   pcall(vim.keymap.del, "n", "d", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "o", "d", {buffer = buftable.buf})
 end
 
 function ModeManager:add_cancel_keymapping()
@@ -259,6 +262,7 @@ end
 function ModeManager:remove_cancel_keymapping()
   local buftable = state.get_buffer_table()
   pcall(vim.keymap.del, {"o", "n"}, "<esc>", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "o", "d", {buffer = buftable.buf})
 end
 
 M.ModeManager = ModeManager

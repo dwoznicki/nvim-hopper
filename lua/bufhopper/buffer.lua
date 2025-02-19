@@ -16,6 +16,7 @@ local M = {}
 ---@field pinned_buffers BufhopperBuffer[]
 ---@field buffers BufhopperBuffer[]
 ---@field create fun(): BufhopperBufferList
+---@field remove_index fun(self: BufhopperBufferList, idx: integer): nil
 ---@field remove_index_range fun(self: BufhopperBufferList, start_idx: integer, end_idx: integer): nil
 local BufferList = {}
 BufferList.__index = BufferList
@@ -103,8 +104,14 @@ function BufferList:populate()
   end)
   self.buffers = buffers
   self.pinned_buffers = {} -- TODO
-
 end
+
+function BufferList:remove_index(idx)
+  local buffer = self.buffers[idx]
+  vim.api.nvim_buf_delete(buffer.buf, {})
+  table.remove(self.buffers, idx)
+end
+
 
 function BufferList:remove_index_range(start_idx, end_idx)
   for i = end_idx, start_idx, -1 do
