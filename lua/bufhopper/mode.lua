@@ -7,10 +7,10 @@ local M = {}
 
 ---@class BufhopperModeManager
 ---@field mode BufhopperMode | nil
----@field prev_mode BufhopperMode | nil
+---@field last_stable_mode BufhopperMode | nil
 ---@field create fun(): BufhopperModeManager
 ---@field set_mode fun(self: BufhopperModeManager, mode: BufhopperMode): nil
----@field revert_mode fun(self: BufhopperModeManager): nil
+---@field revert_to_last_stable_mode fun(self: BufhopperModeManager): nil
 ---@field setup fun(self: BufhopperModeManager): nil
 ---@field teardown fun(self: BufhopperModeManager): nil
 local ModeManager = {}
@@ -25,7 +25,9 @@ end
 
 function ModeManager:set_mode(mode)
   self:teardown()
-  self.prev_mode = self.mode
+  if mode ~= "delete" then
+    self.last_stable_mode = mode
+  end
   self.mode = mode
   self:setup()
   vim.schedule(
@@ -47,8 +49,9 @@ function ModeManager:set_mode(mode)
 
 end
 
-function ModeManager:revert_mode()
-  self:set_mode(self.prev_mode)
+function ModeManager:revert_to_last_stable_mode()
+  print(self.last_stable_mode)
+  self:set_mode(self.last_stable_mode)
 end
 
 function ModeManager:setup()
@@ -211,6 +214,7 @@ function ModeManager:add_enter_delete_mode_keymapping()
     function()
       self:set_mode("delete")
       vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
+      -- Handle "dd" keymap.
       vim.keymap.set("o", "d", "$", {noremap = true, buffer = buftable.buf})
       return "g@"
     end,
@@ -236,7 +240,7 @@ function _G.bufhopper_delete_operator()
     end
     state.get_buffer_table():cursor_to_row(cursor_pos[1])
   end
-  state.get_mode_manager():revert_mode()
+  state.get_mode_manager():revert_to_last_stable_mode()
 end
 
 function ModeManager:remove_enter_delete_mode_keymapping()
@@ -252,7 +256,7 @@ function ModeManager:add_cancel_keymapping()
     {"o", "n"},
     "<esc>",
     function()
-      self:revert_mode()
+      self:revert_to_last_stable_mode()
       return "<esc>"
     end,
     {expr = true, noremap = true, buffer = buftable.buf}
