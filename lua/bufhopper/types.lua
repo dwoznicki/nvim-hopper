@@ -1,7 +1,0 @@
----@class BufhopperNextKeyContext
----@field config BufhopperConfig
----@field mapped_keys table<string, integer>
----@field keyset string[]
----@field prev_key string | nil
----@field key_index integer
----@field file_name string

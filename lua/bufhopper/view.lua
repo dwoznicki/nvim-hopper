@@ -112,6 +112,7 @@ function BufferTable.attach(float)
   buftable.win = win
   vim.api.nvim_set_option_value("cursorline", true, {win = win})
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:BufhopperCursorLine", {win = win})
+  -- Close on "q" keypress.
   vim.keymap.set(
     "n",
     "q",
@@ -234,16 +235,30 @@ function BufferTable:draw(options)
 
     table.insert(
       buf_lines,
-      " " .. keymapping .. " " .. display_path .. " " .. buffer.buf_indicators
+      " " .. buffer.buf_indicators .. " " .. display_path .. " " .. keymapping
     )
-    local col_start, col_end = 1, 2
-    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+
+    local col_start, col_end = 1, 4
+    table.insert(hl_locs, {name = "BufhopperBufferIndicators", row = row, col_start = col_start, col_end = col_end})
     col_start = col_end + 1
     col_end = col_start + non_significant_path_length + 1
     table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
     col_start = col_end
     col_end = col_start + significant_path_length
     table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
+    col_start = col_end
+    col_end = col_start + 1
+    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+
+    -- local col_start, col_end = 1, 2
+    -- table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+    -- col_start = col_end + 1
+    -- col_end = col_start + non_significant_path_length + 1
+    -- table.insert(hl_locs, {name = "BufhopperDirPath", row = row, col_start = col_start, col_end = col_end})
+    -- col_start = col_end
+    -- col_end = col_start + significant_path_length
+    -- table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
+
   end
 
   vim.api.nvim_set_option_value("modifiable", true, {buf = self.buf})
