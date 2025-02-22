@@ -50,7 +50,6 @@ function ModeManager:set_mode(mode)
 end
 
 function ModeManager:revert_to_last_stable_mode()
-  print(self.last_stable_mode)
   self:set_mode(self.last_stable_mode)
 end
 
@@ -86,24 +85,26 @@ function ModeManager:add_buflist_jump_keymappings()
   local buftable = state.get_buffer_table()
   local buffers = state.get_buffer_list().buffers
   for i, buffer in ipairs(buffers) do
-    vim.keymap.set(
-      "n",
-      buffer.key,
-      function()
-        vim.api.nvim_win_set_cursor(buftable.win, {i, 0})
-        if self.mode == "open" then
-          vim.defer_fn(
-            function()
-              state.get_floating_window():close()
-              vim.api.nvim_set_current_buf(buffer.buf)
-            end,
-            50
-          )
-          return
-        end
-      end,
-      {noremap = true, silent = true, nowait = true, buffer = buftable.buf}
-    )
+    if buffer.key ~= nil then
+      vim.keymap.set(
+        "n",
+        buffer.key,
+        function()
+          vim.api.nvim_win_set_cursor(buftable.win, {i, 0})
+          if self.mode == "open" then
+            vim.defer_fn(
+              function()
+                state.get_floating_window():close()
+                vim.api.nvim_set_current_buf(buffer.buf)
+              end,
+              50
+            )
+            return
+          end
+        end,
+        {noremap = true, silent = true, nowait = true, buffer = buftable.buf}
+      )
+    end
   end
 end
 
@@ -111,12 +112,14 @@ function ModeManager:remove_buflist_jump_keymappings()
   local buftable = state.get_buffer_table()
   local buffers = state.get_buffer_list().buffers
   for _, buffer in ipairs(buffers) do
-    pcall(
-      vim.keymap.del,
-      "n",
-      buffer.key,
-      {buffer = buftable.buf}
-    )
+    if buffer.key ~= nil then
+      pcall(
+        vim.keymap.del,
+        "n",
+        buffer.key,
+        {buffer = buftable.buf}
+      )
+    end
   end
 end
 
@@ -224,16 +227,17 @@ end
 
 function _G.bufhopper_delete_operator()
   local buftable = state.get_buffer_table()
+  local buflist = state.get_buffer_list()
   local start_mark = vim.api.nvim_buf_get_mark(buftable.buf, "[")
   local end_mark = vim.api.nvim_buf_get_mark(buftable.buf, "]")
-  local buflist = state.get_buffer_list()
   local cursor_pos = vim.api.nvim_win_get_cursor(buftable.win)
   if start_mark[1] == end_mark[1] then
-    buflist:remove_index(start_mark[1])
+    buflist:remove_at_index(start_mark[1])
   else
-    buflist:remove_index_range(start_mark[1], end_mark[1])
+    buflist:remove_in_index_range(start_mark[1], end_mark[1])
   end
-  state.get_buffer_table():draw()
+  buflist:populate()
+  buftable:draw()
   if #buflist.buffers > 0 then
     if cursor_pos[1] > #buflist.buffers then
       cursor_pos[1] = cursor_pos[1] - 1

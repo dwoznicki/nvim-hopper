@@ -3,6 +3,8 @@
 local M = {}
 
 ---@class BufhopperState
+---@field prior_current_buf integer The active buffer before float opened.
+---@field prior_alternate_buf integer The alternate buffer before float opened.
 ---@field config BufhopperConfig | nil
 ---@field buffer_list BufhopperBufferList | nil
 ---@field floating_window BufhopperFloatingWindow | nil
@@ -12,6 +14,8 @@ local M = {}
 
 ---@type BufhopperState
 M.current = {
+  prior_current_buf = vim.api.nvim_get_current_buf(),
+  prior_alternate_buf = vim.fn.bufnr("#"),
   config = nil,
   buffer_list = nil,
   floating_window = nil,
@@ -19,6 +23,32 @@ M.current = {
   status_line = nil,
   mode_manager = nil,
 }
+
+---@return integer
+function M.get_prior_current_buf()
+  return M.current.prior_current_buf
+end
+
+---@param buf? integer defaults to `vim.api.nvim_get_current_buf()`
+function M.set_prior_current_buf(buf)
+  if buf == nil then
+    buf = vim.api.nvim_get_current_buf()
+  end
+  M.current.prior_current_buf = buf
+end
+
+---@return integer
+function M.get_prior_alternate_buf()
+  return M.current.prior_alternate_buf
+end
+
+---@param buf? integer defaults to `vim.fn.bufnr("#")`
+function M.set_prior_alternate_buf(buf)
+  if buf == nil then
+    buf = vim.fn.bufnr("#")
+  end
+  M.current.prior_alternate_buf = buf
+end
 ---@return BufhopperConfig
 function M.get_config()
   if M.current.config == nil then

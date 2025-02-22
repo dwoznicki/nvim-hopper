@@ -14,6 +14,9 @@ function M.open()
   -- The buffer that we were on before opening the float.
   local current_buf = vim.api.nvim_get_current_buf()
 
+  -- Track buffer state before the cursor enters the floating window.
+  state.set_prior_current_buf()
+  state.set_prior_alternate_buf()
   buffer.BufferList.create()
   local float = view.FloatingWindow.open()
   local buftable = view.BufferTable.attach(float)

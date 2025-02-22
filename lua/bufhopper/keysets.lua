@@ -1,82 +1,95 @@
+local utils = require("bufhopper.utils")
+local set = utils.set
+
 local M = {}
 
 ---@class BufhopperNextKeyContext
 ---@field config BufhopperConfig
----@field mapped_keys table<string, integer>
 ---@field keyset string[]
+---@field mapped_keys table<string, integer>
+---@field remaining_keys table<string, true>
 ---@field prev_key string | nil
----@field key_index integer
+---@field keyset_index integer
 ---@field file_name string
+
+M.presets = {
+  ---@type string[]
+  alpha = {
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+  },
+  ---@type string[]
+  numeric = {
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+  },
+  ---@type string[]
+  alphanumeric = {
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+  },
+  ---@type string[]
+  ergonomic = {
+    "a", "s", "d", "f", "g", "h", "j", "k", "l", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "z", "x", "c", "v", "b", "n", "m", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ";", ",", ".", "'", "[", "]", "/",
+  },
+}
+
+M.reserved_keys = {"d", "g", "j", "k", "q"}
 
 ---@param keyset BufhopperConfig.keyset
 ---@return string[]
 function M.determine_keyset(keyset)
-  if type(keyset) == "string" and M[keyset] ~= nil then
-    return M[keyset]
+  ---@type table<string, true>
+  local keys
+  if type(keyset) == "string" and M.presets[keyset] ~= nil then
+    keys = set(M.presets[keyset])
+  elseif type(keyset) == "table" then
+    keys = set(keyset)
+  else
+    -- Just pick a reasonable default.
+    keys = set(M.presets.alphanumeric)
   end
-  if type(keyset) == "table" then
-    ---@diagnostic disable-next-line: return-type-mismatch
-    return keyset
+  ---@type string[]
+  local reserved_keys = set(M.reserved_keys)
+  local filtered_keys = {}
+  for key, _ in pairs(keys) do
+    if not reserved_keys[key] then
+      table.insert(filtered_keys, key)
+    end
   end
-  -- Just pick a reasonable default.
-  return M.ergonomic
+  return filtered_keys
 end
 
 ---@param context BufhopperNextKeyContext
 ---@return string | nil
 function M.next_key_sequential(context)
-  local key
+  ---@type string | nil
   for _ = 1, 100 do
-    key = context.keyset[context.key_index]
-    if key == nil then
-      break
+    local key_candidate = context.keyset[context.keyset_index]
+    if key_candidate == nil then
+      return nil
     end
-    context.key_index = context.key_index + 1
-    if context.mapped_keys[key] ~= nil then
-      goto continue
-    else
-      break
+    if context.remaining_keys[key_candidate] ~= nil then
+      return key_candidate
     end
-    ::continue::
   end
-  return key
+  return nil
 end
 
 ---@param context BufhopperNextKeyContext
 ---@return string | nil
 function M.next_key_filename(context)
-  local key
   for i = 1, string.len(context.file_name) do
-    key = string.sub(context.file_name, i, i)
-    if key == nil then
+    local key_candidate = string.sub(context.file_name, i, i)
+    if key_candidate == nil then
       break
     end
-    if context.mapped_keys[key] ~= nil then
-      goto continue
+    if context.remaining_keys[key_candidate] ~= nil then
+      return key_candidate
     end
-    local found_in_keyset = false
-    for _, k in ipairs(context.keyset) do
-      if k == key then
-        found_in_keyset = true
-        break
-      end
-    end
-    if found_in_keyset then
-      break
-    end
-    ::continue::
   end
-  return key
+  -- We couldn't find a key for the filename. Just pick something at random.
+  for key, _ in pairs(context.remaining_keys) do
+    return key
+  end
+  return nil
 end
-
-M.alpha = {
-  "a", "b", "c", "e", "f", "h", "i", "l", "m", "n", "o", "p", "r", "s", "t", "u", "v", "w", "x", "y", "z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-}
-M.numeric = {
-  "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-}
-M.ergonomic = {
-  "a", "s", "f", "l", "w", "e", "r", "t", "u", "i", "o", "p", "z", "x", "c", "v", "b", "n", "m", "h", "y", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-}
 
 return M

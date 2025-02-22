@@ -25,4 +25,14 @@ function M.get_win_dimensions(num_buffer_rows)
   return 16, available_width
 end
 
+---@param list string[]
+---@return table<string, true>
+function M.set(list)
+  local set = {}
+  for _, value in ipairs(list) do
+    set[value] = true
+  end
+  return set
+end
+
 return M

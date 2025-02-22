@@ -226,7 +226,7 @@ function BufferTable:draw(options)
 
     ---@type string
     local keymapping
-    if options.hide_keymapping then
+    if options.hide_keymapping or buffer.key == nil then
       -- Maintain the space, but don't display the key.
       keymapping = " "
     else

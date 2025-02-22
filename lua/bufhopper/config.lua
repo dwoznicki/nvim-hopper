@@ -1,6 +1,6 @@
 local M = {}
 
----@alias BufhopperConfig.keyset "alpha" | "numeric" | "ergonomic" | string[]
+---@alias BufhopperConfig.keyset "alpha" | "numeric" | "alphanumeric" | string[]
 ---@alias BufhopperConfig.next_key "sequential" | "filename" | fun(context: BufhopperNextKeyContext): string | nil
 
 ---@class BufhopperConfig
@@ -16,7 +16,7 @@ local M = {}
 ---@return BufhopperConfig
 function M.default_config()
   return {
-    keyset = "ergonomic",
+    keyset = "alphanumeric",
     next_key = "filename",
     default_mode = "jump",
   }
