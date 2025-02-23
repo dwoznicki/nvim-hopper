@@ -21,34 +21,24 @@ function FloatingWindow.open()
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
-  vim.api.nvim_set_option_value("filetype", "bufhopperfloat", {buf = buf})
   local ui = vim.api.nvim_list_uis()[1]
-  local win_height, win_width = utils.get_win_dimensions(0)
+  local win_width, win_height = utils.get_win_dimensions()
   ---@type vim.api.keyset.win_config
   local win_config = {
     style = "minimal",
     relative = "editor",
-    width = win_width + 2, -- extra for borders
-    height = win_height + 2, -- extra for borders
+    width = win_width,
+    height = win_height,
     row = 3,
     col = math.floor((ui.width - win_width) * 0.5),
-    border = "none",
+    -- border = "none",
     focusable = false,
-    -- title = " Buffers ",
-    -- title_pos = "center",
-    -- border = "rounded",
+    title = " Buffers ",
+    title_pos = "center",
+    border = "rounded",
   }
   local win = vim.api.nvim_open_win(buf, false, win_config)
   float.win = win
-
-  -- -- Close the float when the cursor leaves.
-  -- vim.api.nvim_create_autocmd("WinLeave", {
-  --   buffer = buf,
-  --   once = true,
-  --   callback = function()
-  --     self:close()
-  --   end,
-  -- })
 
   state.set_floating_window(float)
   return float
@@ -93,9 +83,9 @@ function BufferTable.attach(float)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
-  vim.api.nvim_set_option_value("filetype", "bufhopperbuflist", {buf = buf})
+  vim.api.nvim_set_option_value("filetype", "BufhopperFloat", {buf = buf})
   buftable.buf = buf
-  local win_height, win_width = utils.get_win_dimensions(0)
+  local win_width, win_height = utils.get_win_dimensions()
   ---@type vim.api.keyset.win_config
   local win_config = {
     style = "minimal",
@@ -103,8 +93,8 @@ function BufferTable.attach(float)
     win = float.win,
     width = win_width,
     height = win_height - 1, -- space for status line
-    row = 1,
-    col = 1,
+    row = 0,
+    col = 0,
     border = "none",
     focusable = true,
   }
@@ -119,6 +109,22 @@ function BufferTable.attach(float)
     "<cmd>q<cr>",
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
+
+  -- vim.keymap.set(
+  --   "n",
+  --   "gg",
+  --   "gg",
+  --   {noremap = true, silent = true, nowait = true, buffer = buf}
+  -- )
+
+  -- Close the float when the cursor leaves.
+  vim.api.nvim_create_autocmd("WinLeave", {
+    buffer = buf,
+    once = true,
+    callback = function()
+      state.get_floating_window():close()
+    end,
+  })
   vim.api.nvim_create_autocmd("BufWipeout", {
     buffer = buf,
     once = true,
@@ -134,7 +140,7 @@ end
 function BufferTable:draw(options)
   local buffers = state.get_buffer_list().buffers
   options = options or {}
-  local _, win_width = utils.get_win_dimensions(0)
+  local win_width, _ = utils.get_win_dimensions()
   local _, file_path_col_width, _ = M.get_column_widths(win_width)
 
   ---@class TreeNode: table<string, TreeNode>
@@ -151,15 +157,13 @@ function BufferTable:draw(options)
     end
   end
 
-  ---@type string[]
-  local buf_lines = {}
+  local buf_lines = {} ---@type string[]
   ---@type {name: string, row: integer, col_start: integer, col_end: integer}[]
   local hl_locs = {}
 
   for i, buffer in ipairs(buffers) do
     local remaining_file_path_width = file_path_col_width
-    ---@type string[]
-    local display_path_tokens = {}
+    local display_path_tokens = {} ---@type string[]
     local significant_path_length = 0
     local curr_node = reverse_path_token_tree
     for j = #buffer.file_path_tokens, 1, -1 do
@@ -308,9 +312,8 @@ function StatusLine.attach(float)
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
   vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
-  vim.api.nvim_set_option_value("filetype", "bufhopperstatline", {buf = buf})
   statline.buf = buf
-  local win_height, win_width = utils.get_win_dimensions(0)
+  local win_width, win_height = utils.get_win_dimensions()
   ---@type vim.api.keyset.win_config
   local win_config = {
     style = "minimal",
@@ -318,8 +321,8 @@ function StatusLine.attach(float)
     win = float.win,
     width = win_width,
     height = 1,
-    row = win_height,
-    col = 1,
+    row = win_height - 1,
+    col = 0,
     border = "none",
     focusable = false,
   }

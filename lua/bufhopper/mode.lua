@@ -11,8 +11,6 @@ local M = {}
 ---@field create fun(): BufhopperModeManager
 ---@field set_mode fun(self: BufhopperModeManager, mode: BufhopperMode): nil
 ---@field revert_to_last_stable_mode fun(self: BufhopperModeManager): nil
----@field setup fun(self: BufhopperModeManager): nil
----@field teardown fun(self: BufhopperModeManager): nil
 local ModeManager = {}
 ModeManager.__index = ModeManager
 
@@ -24,12 +22,20 @@ function ModeManager.create()
 end
 
 function ModeManager:set_mode(mode)
-  self:teardown()
-  if mode ~= "delete" then
-    self.last_stable_mode = mode
+  local prev_mode = self.mode
+  if mode == "delete" then
+    if prev_mode == "jump" or prev_mode == "open" then
+      self:remove_jump_mode_keymaps()
+    end
+    self:add_delete_mode_keymaps()
+    self.last_stable_mode = prev_mode or "jump"
+  elseif (mode == "jump" or mode == "open") then
+    if prev_mode == "delete" then
+      self:remove_delete_mode_keymaps()
+    end
+    self:add_jump_mode_keymaps()
   end
   self.mode = mode
-  self:setup()
   vim.schedule(
     function()
       state.get_status_line():draw()
@@ -53,37 +59,12 @@ function ModeManager:revert_to_last_stable_mode()
   self:set_mode(self.last_stable_mode)
 end
 
-function ModeManager:setup()
-  if self.mode == "jump" then
-    self:add_buflist_jump_keymappings()
-    self:add_buflist_select_keymappings()
-    self:add_enter_delete_mode_keymapping()
-  elseif self.mode == "open" then
-    self:add_buflist_jump_keymappings()
-    self:add_jk_escape_hatch_keymappings()
-    self:add_enter_delete_mode_keymapping()
-  elseif self.mode == "delete" then
-    self:add_cancel_keymapping()
-  end
-end
-
-function ModeManager:teardown()
-  if self.mode == "jump" then
-    self:remove_buflist_jump_keymappings()
-    self:remove_buflist_select_keymappings()
-    self:remove_enter_delete_mode_keymapping()
-  elseif self.mode == "open" then
-    self:remove_buflist_jump_keymappings()
-    self:remove_jk_escape_hatch_keymappings()
-    self:remove_enter_delete_mode_keymapping()
-  elseif self.mode == "delete" then
-    self:remove_cancel_keymapping()
-  end
-end
-
-function ModeManager:add_buflist_jump_keymappings()
+function ModeManager:add_jump_mode_keymaps()
   local buftable = state.get_buffer_table()
   local buffers = state.get_buffer_list().buffers
+
+  -- Add buffer specific jump keymaps.
+  vim.print("adding buffer specific keymaps")
   for i, buffer in ipairs(buffers) do
     if buffer.key ~= nil then
       vim.keymap.set(
@@ -106,26 +87,7 @@ function ModeManager:add_buflist_jump_keymappings()
       )
     end
   end
-end
-
-function ModeManager:remove_buflist_jump_keymappings()
-  local buftable = state.get_buffer_table()
-  local buffers = state.get_buffer_list().buffers
-  for _, buffer in ipairs(buffers) do
-    if buffer.key ~= nil then
-      pcall(
-        vim.keymap.del,
-        "n",
-        buffer.key,
-        {buffer = buftable.buf}
-      )
-    end
-  end
-end
-
-function ModeManager:add_buflist_select_keymappings()
-  local buftable = state.get_buffer_table()
-  local buffers = state.get_buffer_list().buffers
+  -- Add buffer selection keymaps.
   vim.keymap.set(
     "n",
     "<cr>",
@@ -164,53 +126,7 @@ function ModeManager:add_buflist_select_keymappings()
     end,
     {silent = true, nowait = true, buffer = buftable.buf}
   )
-end
-
-function ModeManager:remove_buflist_select_keymappings()
-  local buftable = state.get_buffer_table()
-  pcall(vim.keymap.del, "n", "<cr>", {buffer = buftable.buf})
-  pcall(vim.keymap.del, "n", "H", {buffer = buftable.buf})
-  pcall(vim.keymap.del, "n", "V", {buffer = buftable.buf})
-end
-
-function ModeManager:add_jk_escape_hatch_keymappings()
-  local buftable = state.get_buffer_table()
-  vim.keymap.set(
-    "n",
-    "j",
-    function()
-      M.set_mode("jump")
-      vim.api.nvim_feedkeys(
-        vim.api.nvim_replace_termcodes("j", true, false, true),
-        "n",
-        false
-      )
-    end,
-    {silent = true, nowait = true, buffer = buftable.buf}
-  )
-  vim.keymap.set(
-    "n",
-    "k",
-    function()
-      M.set_mode("jump")
-      vim.api.nvim_feedkeys(
-        vim.api.nvim_replace_termcodes("k", true, false, true),
-        "n",
-        false
-      )
-    end,
-    {silent = true, nowait = true, buffer = buftable.buf}
-  )
-end
-
-function ModeManager:remove_jk_escape_hatch_keymappings()
-  local buftable = state.get_buffer_table()
-  pcall(vim.keymap.del, "n", "j", {buffer = buftable.buf})
-  pcall(vim.keymap.del, "n", "k", {buffer = buftable.buf})
-end
-
-function ModeManager:add_enter_delete_mode_keymapping()
-  local buftable = state.get_buffer_table()
+  -- Add enter delete mode keymaps.
   vim.keymap.set(
     "n",
     "d",
@@ -247,13 +163,8 @@ function _G.bufhopper_delete_operator()
   state.get_mode_manager():revert_to_last_stable_mode()
 end
 
-function ModeManager:remove_enter_delete_mode_keymapping()
-  local buftable = state.get_buffer_table()
-  pcall(vim.keymap.del, "n", "d", {buffer = buftable.buf})
-  pcall(vim.keymap.del, "o", "d", {buffer = buftable.buf})
-end
 
-function ModeManager:add_cancel_keymapping()
+function ModeManager:add_delete_mode_keymaps()
   local buftable = state.get_buffer_table()
   -- Cancel delete mode when the user presses escape.
   vim.keymap.set(
@@ -267,7 +178,31 @@ function ModeManager:add_cancel_keymapping()
   )
 end
 
-function ModeManager:remove_cancel_keymapping()
+function ModeManager:remove_jump_mode_keymaps()
+  local buftable = state.get_buffer_table()
+  local buffers = state.get_buffer_list().buffers
+
+  -- Remove buffer specific jump keymaps.
+  for _, buffer in ipairs(buffers) do
+    if buffer.key ~= nil then
+      pcall(
+        vim.keymap.del,
+        "n",
+        buffer.key,
+        {buffer = buftable.buf}
+      )
+    end
+  end
+  -- Remove buffer selection keymaps.
+  pcall(vim.keymap.del, "n", "<cr>", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "n", "H", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "n", "V", {buffer = buftable.buf})
+  -- Remove enter delete mode keymaps.
+  pcall(vim.keymap.del, "n", "d", {buffer = buftable.buf})
+  pcall(vim.keymap.del, "o", "d", {buffer = buftable.buf})
+end
+
+function ModeManager:remove_delete_mode_keymaps()
   local buftable = state.get_buffer_table()
   pcall(vim.keymap.del, {"o", "n"}, "<esc>", {buffer = buftable.buf})
   pcall(vim.keymap.del, "o", "d", {buffer = buftable.buf})

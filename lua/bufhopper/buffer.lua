@@ -17,6 +17,7 @@ local M = {}
 ---@class BufhopperBufferList
 ---@field pinned_buffers BufhopperBuffer[]
 ---@field buffers BufhopperBuffer[]
+---@field page integer default = 0
 ---@field create fun(): BufhopperBufferList
 ---@field remove_at_index fun(self: BufhopperBufferList, idx: integer): nil
 ---@field remove_in_index_range fun(self: BufhopperBufferList, start_idx: integer, end_idx: integer): nil
@@ -26,6 +27,7 @@ BufferList.__index = BufferList
 function BufferList.create()
   local buflist = {}
   setmetatable(buflist, BufferList)
+  buflist.page = 0
   buflist:populate()
   state.set_buffer_list(buflist)
   return buflist
@@ -33,30 +35,33 @@ end
 
 function BufferList:populate()
   local config = state.get_config()
-  ---@type BufhopperBuffer[]
-  local buffers = {}
+  local bufs = {} ---@type integer[]
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if (vim.api.nvim_buf_is_loaded(buf) or config.buffers.show_unloaded)
+      and (vim.bo[buf].buflisted or config.buffers.show_hidden)
+    then
+      table.insert(bufs, buf)
+    end
+  end
+
+  if config.buffers.paginate then
+    local _, win_height = utils.get_win_dimensions()
+    local page_size = win_height - 3
+    local page_start = (self.page * page_size) + 1
+    if #bufs < page_start then
+      vim.notify("Page is out or range. Resetting to page 1.", vim.log.levels.INFO)
+      self.page = 0
+      page_start = 1
+    end
+    local page_end = page_start + page_size
+    bufs = vim.list_slice(bufs, page_start, page_end)
+  end
 
   local keyset = keysets.determine_keyset(config.keyset)
-  ---@type string | nil
-  local prev_key = nil
 
-  -- ---@type function(context: BufhopperNextKeyContext): string | nil
-  -- local next_key_fn
-  -- if type(config.next_key) == "function" then
-  --   --- LuaLS gets this wrong.
-  --   ---@diagnostic disable-next-line: cast-local-type
-  --   next_key_fn = config.next_key
-  -- elseif config.next_key == "filename" then
-  --   next_key_fn = keysets.next_key_filename
-  -- else -- "sequential"
-  --   next_key_fn = keysets.next_key_sequential
-  -- end
-
-  ---@type table<string, integer>
-  local mapped_keys = {}
-  ---@type table<string, true>
-  local remaining_keys = set(keyset)
-
+  local prev_key = nil ---@type string | nil
+  local mapped_keys = {} ---@type table<string, integer>
+  local remaining_keys = set(keyset) ---@type table<string, true>
   ---@type BufhopperNextKeyContext
   local next_key_context = {
     config = config,
@@ -70,33 +75,16 @@ function BufferList:populate()
 
   local current_buf = state.get_prior_current_buf()
   local alternate_buf = state.get_prior_alternate_buf()
-  for _, openbuf in ipairs(vim.api.nvim_list_bufs()) do
-    -- if not vim.api.nvim_buf_is_loaded(openbuf) or vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
-    if vim.api.nvim_get_option_value("buftype", {buf = openbuf}) ~= "" then
-      goto continue
-    end
-    local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(openbuf))
+
+  local buffers = {} ---@type BufhopperBuffer[]
+  for _, buf in ipairs(bufs) do
+    local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(buf))
     local project_file_path_tokens = vim.split(project_file_path, "/")
     local file_name = vim.fn.fnamemodify(project_file_path, ":t")
-    local buf_indicators = M.get_buffer_indicators(openbuf, current_buf, alternate_buf)
+    local buf_indicators = M.get_buffer_indicators(buf, current_buf, alternate_buf)
     next_key_context.file_name = file_name
 
-    -- ---@type string | nil
-    -- local key
-    -- for _ = 1, 40 do
-    --   key = next_key_fn(next_key_context)
-    --   if key ~= nil then
-    --     break
-    --   end
-    -- end
-    -- if key == nil then
-    --   break
-    -- end
-    -- next_key_context.prev_key = key
-    -- mapped_keys[key] = openbuf
-
-    ---@type string | nil
-    local key = nil
+    local key = nil ---@type string | nil
     if type(config.next_key) == "function" then
       --- LuaLS gets this wrong.
       ---@diagnostic disable-next-line: cast-local-type
@@ -109,21 +97,20 @@ function BufferList:populate()
     end
     next_key_context.prev_key = key
     if key ~= nil then
-      mapped_keys[key] = openbuf
+      mapped_keys[key] = buf
       remaining_keys[key] = nil
     end
 
     ---@type BufhopperBuffer
     local buffer = {
       key = key,
-      buf = openbuf,
+      buf = buf,
       file_name = file_name,
       file_path = project_file_path,
       file_path_tokens = project_file_path_tokens,
       buf_indicators = buf_indicators,
     }
     table.insert(buffers, buffer)
-    ::continue::
   end
   table.sort(buffers, function(a, b)
     return a.buf < b.buf
@@ -160,8 +147,7 @@ M.BufferList = BufferList
 ---@return string
 function M.get_buffer_indicators(buf, current_buf, alternate_buf)
   local buf_info = vim.fn.getbufinfo(buf)[1]
-  ---@type string
-  local ind1
+  local ind1 ---@type string
   if buf == current_buf then
     ind1 = "%"
   elseif buf == alternate_buf then
@@ -169,8 +155,7 @@ function M.get_buffer_indicators(buf, current_buf, alternate_buf)
   else
     ind1 = " "
   end
-  ---@type string
-  local ind2
+  local ind2 ---@type string
   if #buf_info.windows > 0 then
     ind2 = "a"
   elseif buf_info.hidden == 1 then
@@ -178,8 +163,7 @@ function M.get_buffer_indicators(buf, current_buf, alternate_buf)
   else
     ind2 = " "
   end
-  ---@type string
-  local ind3
+  local ind3 ---@type string
   if buf_info.changed == 1 then
     ind3 = "+"
   else
