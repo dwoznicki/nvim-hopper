@@ -110,13 +110,6 @@ function BufferTable.attach(float)
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
 
-  -- vim.keymap.set(
-  --   "n",
-  --   "gg",
-  --   "gg",
-  --   {noremap = true, silent = true, nowait = true, buffer = buf}
-  -- )
-
   -- Close the float when the cursor leaves.
   vim.api.nvim_create_autocmd("WinLeave", {
     buffer = buf,
