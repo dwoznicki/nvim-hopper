@@ -14,6 +14,8 @@ local function set_highlights()
     vim.api.nvim_set_hl(0, "BufhopperModeJump", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.springBlue})
     vim.api.nvim_set_hl(0, "BufhopperModeDelete", {fg = kanagawa_colors.palette.sumiInk1, bg = kanagawa_colors.palette.autumnRed})
   end
+  vim.api.nvim_set_hl(0, "BufhopperPaginationEnabled", {fg = "#ffffff"})
+  vim.api.nvim_set_hl(0, "BufhopperPaginationDisabled", {fg = "#aaaaaa"})
   if vim.o.background == "dark" then
     vim.api.nvim_set_hl(0, "BufhopperFileName", {fg = "#fdfd96"})
     vim.api.nvim_set_hl(0, "BufhopperDirPath", {fg = "#636363"})

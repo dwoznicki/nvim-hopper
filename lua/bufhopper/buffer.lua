@@ -18,6 +18,7 @@ local M = {}
 ---@field pinned_buffers BufhopperBuffer[]
 ---@field buffers BufhopperBuffer[]
 ---@field page integer default = 0
+---@field total_pages integer default = 1
 ---@field create fun(): BufhopperBufferList
 ---@field remove_at_index fun(self: BufhopperBufferList, idx: integer): nil
 ---@field remove_in_index_range fun(self: BufhopperBufferList, start_idx: integer, end_idx: integer): nil
@@ -28,6 +29,7 @@ function BufferList.create()
   local buflist = {}
   setmetatable(buflist, BufferList)
   buflist.page = 0
+  buflist.total_pages = 1
   buflist:populate()
   state.set_buffer_list(buflist)
   return buflist
@@ -47,6 +49,7 @@ function BufferList:populate()
   if config.buffers.paginate then
     local _, win_height = utils.get_win_dimensions()
     local page_size = win_height - 3
+    self.total_pages = math.ceil(#bufs / page_size)
     local page_start = (self.page * page_size) + 1
     if #bufs < page_start then
       vim.notify("Page is out or range. Resetting to page 1.", vim.log.levels.INFO)
@@ -132,11 +135,47 @@ function BufferList:remove_at_index(idx)
   table.remove(self.buffers, idx)
 end
 
-
 function BufferList:remove_in_index_range(start_idx, end_idx)
   for i = end_idx, start_idx, -1 do
     self:remove_at_index(i)
   end
+end
+
+function BufferList:add_pagination_keymaps()
+  local buftable = state.get_buffer_table()
+
+  vim.keymap.set(
+    "n",
+    "<tab>",
+    function()
+      local next_page = self.page + 1
+      vim.print("next_page", next_page)
+      if next_page >= self.total_pages then
+        return
+      end
+      self.page = next_page
+      self:populate()
+      state.get_buffer_table():draw()
+      state.get_status_line():draw()
+    end,
+    {silent = true, nowait = true, buffer = buftable.buf}
+  )
+  vim.keymap.set(
+    "n",
+    "<S-tab>",
+    function()
+      local prev_page = self.page - 1
+      vim.print("prev_page", prev_page)
+      if prev_page < 0 then
+        return
+      end
+      self.page = prev_page
+      self:populate()
+      state.get_buffer_table():draw()
+      state.get_status_line():draw()
+    end,
+    {silent = true, nowait = true, buffer = buftable.buf}
+  )
 end
 
 M.BufferList = BufferList

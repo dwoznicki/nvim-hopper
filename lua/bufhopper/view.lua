@@ -336,17 +336,47 @@ function StatusLine:draw()
   local mode = state.get_mode_manager().mode
   ---@type {name: string, row: integer, col_start: integer, col_end: integer}[]
   local hl_locs = {}
-  ---@type string[]
-  local buf_lines = {}
+  local buf_lines = {} ---@type string[]
+  local mode_indicator ---@type string
   if mode == "jump" then
-    table.insert(buf_lines, "  Jump ")
+    mode_indicator = "  Jump "
     table.insert(hl_locs, {name = "BufhopperModeJump", row = 0, col_start = 1, col_end = 7})
   elseif mode == "open" then
-    table.insert(buf_lines, "  Open ")
+    mode_indicator = "  Open "
     table.insert(hl_locs, {name = "BufhopperModeOpen", row = 0, col_start = 1, col_end = 7})
   elseif mode == "delete" then
-    table.insert(buf_lines, "  Delete ")
+    mode_indicator = "  Delete "
     table.insert(hl_locs, {name = "BufhopperModeDelete", row = 0, col_start = 1, col_end = 9})
+  end
+
+  local buflist = state.get_buffer_list()
+  if buflist.total_pages > 1 then
+    local page_indicator = buflist.page + 1 .."/" .. buflist.total_pages .. " "
+    local pagination_indicators = "󰌥  prev, next 󰌒 "
+    local win_width, _ = utils.get_win_dimensions()
+    local padding = string.rep(" ", win_width - vim.fn.strdisplaywidth(mode_indicator) - vim.fn.strdisplaywidth(page_indicator) - vim.fn.strdisplaywidth(pagination_indicators))
+    local prev_col_start = string.len(mode_indicator .. padding .. page_indicator)
+    local prev_col_end = prev_col_start + 10
+    local prev_hl_name ---@type string
+    if buflist.page < 1 then
+      prev_hl_name = "BufhopperPaginationDisabled"
+    else
+      prev_hl_name = "BufhopperPaginationEnabled"
+    end
+    table.insert(hl_locs, {name = prev_hl_name, row = 0, col_start = prev_col_start, col_end = prev_col_end})
+    local next_col_start = prev_col_end + 2
+    local next_col_end = next_col_start + 10
+    local next_hl_name ---@type string
+    if buflist.page + 1 >= buflist.total_pages then
+      next_hl_name = "BufhopperPaginationDisabled"
+    else
+      next_hl_name = "BufhopperPaginationEnabled"
+    end
+    table.insert(hl_locs, {name = next_hl_name, row = 0, col_start = next_col_start, col_end = next_col_end})
+    table.insert(buf_lines, mode_indicator .. padding .. page_indicator .. pagination_indicators)
+    buflist:add_pagination_keymaps()
+  else
+    table.insert(buf_lines, mode_indicator)
   end
 
   vim.api.nvim_set_option_value("modifiable", true, {buf = self.buf})
@@ -358,7 +388,7 @@ function StatusLine:draw()
   vim.api.nvim_set_option_value("modifiable", false, {buf = self.buf})
   -- Force a redraw. This handles an issue where which-key stops the UI from updating until after
   -- the delayed drawer opens.
-  vim.cmd("redraw")
+  -- vim.cmd("redraw")
 end
 
 function StatusLine:close()

@@ -64,7 +64,6 @@ function ModeManager:add_jump_mode_keymaps()
   local buffers = state.get_buffer_list().buffers
 
   -- Add buffer specific jump keymaps.
-  vim.print("adding buffer specific keymaps")
   for i, buffer in ipairs(buffers) do
     if buffer.key ~= nil then
       vim.keymap.set(
