@@ -28,6 +28,7 @@ local root_markers = {
 }
 
 ---@param dir string
+---@return boolean is_root true if this dir looks like the root of a project
 local function is_project_root(dir)
   for _, marker in ipairs(root_markers) do
     if vim.fn.filereadable(vim.fn.expand(dir .. "/" .. marker)) == 1 or
@@ -39,11 +40,12 @@ local function is_project_root(dir)
 end
 
 ---@param starting_dir string
+---@return string | nil project_root
 local function find_project_root(starting_dir)
   local dir = starting_dir
   while dir ~= "/" do
     if is_project_root(dir) then
-        return dir
+      return dir
     end
     dir = vim.fn.fnamemodify(dir, ":h")
   end
@@ -51,13 +53,25 @@ local function find_project_root(starting_dir)
 end
 
 ---@param file_path string
----@return string
+---@return string absolute_path
+local function to_absoluate_path(file_path)
+  if string.sub(file_path, 1, 1) == "/" then
+    -- Path already appears to be absolute.
+    return vim.uv.fs_realpath(file_path) or file_path
+  else
+    local abs_path = vim.uv.cwd() .. "/" .. file_path
+    return vim.uv.fs_realpath(abs_path) or abs_path
+  end
+end
+
+---@param file_path string
+---@return string path_from_project_root
 function M.get_path_from_project_root(file_path)
-  local abs_path = vim.fn.expand(file_path)
+  local abs_path = to_absoluate_path(file_path)
   local file_dir = vim.fn.fnamemodify(abs_path, ":h")
   local project_root = find_project_root(file_dir)
   if project_root then
-    return vim.fn.fnamemodify(abs_path, ":." .. project_root)
+    return string.sub(abs_path, string.len(project_root) + 2)
   else
     return abs_path
   end
