@@ -1,5 +1,3 @@
----@module 'luassert'
-
 local filepath = require("bufhopper.filepath")
 
 describe("filepath utilities", function()
