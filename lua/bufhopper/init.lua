@@ -18,7 +18,7 @@ function M.setup(options)
   require("bufhopper.highlight").setup()
   require("bufhopper.usercommand").setup()
   require("bufhopper.mode").ModeManager.create()
-  require("bufhopper.integrations").setup()
+  -- require("bufhopper.integrations").setup()
 end
 
 return M

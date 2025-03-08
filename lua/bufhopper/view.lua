@@ -109,6 +109,14 @@ function BufferTable.attach(float)
     "<cmd>q<cr>",
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
+  -- Close on "<esc>" keypress.
+  vim.keymap.set(
+    "n",
+    "<esc>",
+    "<cmd>q<cr>",
+    {noremap = true, silent = true, nowait = true, buffer = buf}
+  )
+  require("bufhopper.integrations").clear_whichkey(buf)
 
   -- Close the float when the cursor leaves.
   vim.api.nvim_create_autocmd("WinLeave", {
