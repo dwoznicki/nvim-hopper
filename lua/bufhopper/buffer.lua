@@ -19,7 +19,7 @@ local M = {}
 ---@field buffers BufhopperBuffer[]
 ---@field page integer default = 0
 ---@field total_pages integer default = 1
----@field buffers_by_key table<string, BufhopperBuffer | nil>
+---@field buffers_by_key table<string, BufhopperBuffer | -1>
 ---@field create fun(): BufhopperBufferList
 ---@field remove_at_index fun(self: BufhopperBufferList, idx: integer): nil
 ---@field remove_in_index_range fun(self: BufhopperBufferList, start_idx: integer, end_idx: integer): nil
@@ -80,9 +80,9 @@ function BufferList:populate()
   local current_buf = state.get_prior_current_buf()
   local alternate_buf = state.get_prior_alternate_buf()
 
-  local buffers_by_key = {} ---@type table<string, BufhopperBuffer | nil>
+  local buffers_by_key = {} ---@type table<string, BufhopperBuffer | -1>
   for _, key in ipairs(keyset) do
-    buffers_by_key[key] = nil
+    buffers_by_key[key] = -1
   end
   local buffers = {} ---@type BufhopperBuffer[]
   for _, buf in ipairs(bufs) do
@@ -246,7 +246,8 @@ function M.get_backup_display_buf(buf)
   -- Next, try the buf after the given buf sequentially.
   local next_best_candidate_buf = -1
   for _, backup_candidate_buf in ipairs(vim.api.nvim_list_bufs()) do
-    if vim.api.nvim_get_option_value("buftype", {buf = backup_candidate_buf}) ~= "" and vim.api.nvim_buf_is_valid(backup_candidate_buf) then
+    local buftype = vim.api.nvim_get_option_value("buftype", {buf = backup_candidate_buf})
+    if buftype ~= "nofile" and vim.api.nvim_buf_is_valid(backup_candidate_buf) then
       if backup_candidate_buf > buf then
         return backup_candidate_buf
       end

@@ -55,18 +55,31 @@ end
 function ModeManager:add_jump_mode_keymaps()
   local tbl = state.get_buffer_table()
   local buflist = state.get_buffer_list()
+  local config = state.get_config()
 
   for key, buffer in pairs(buflist.buffers_by_key) do
+    pcall(vim.keymap.del, "n", key, {buffer = tbl.buf})
     vim.keymap.set(
       "n",
       key,
       function()
-        if buffer == nil then
-          vim.notify("Key '" .. key .. "' not mapped to buffer.", vim.log.levels.WARN)
+        if buffer == -1 then
+          vim.notify("Key '" .. key .. "' not mapped to buffer.", vim.log.levels.INFO)
           return
         end
-        state.get_floating_window():close()
-        vim.api.nvim_set_current_buf(buffer.buf)
+        if config.jump_mode ~= nil and config.jump_mode.delay ~= nil and config.jump_mode.delay > 0 then
+          tbl:cursor_to_buf(buffer.buf)
+          vim.defer_fn(
+            function()
+              state.get_floating_window():close()
+              vim.api.nvim_set_current_buf(buffer.buf)
+            end,
+            config.jump_mode.delay
+          )
+        else
+          state.get_floating_window():close()
+          vim.api.nvim_set_current_buf(buffer.buf)
+        end
       end,
       {noremap = true, silent = true, nowait = true, buffer = tbl.buf}
     )
@@ -226,11 +239,39 @@ function ModeManager:add_normal_mode_keymaps()
 
   vim.keymap.set(
     "n",
+    "J",
+    function()
+      self:set_mode("jump")
+    end,
+    {noremap = true, nowait = true, buffer = tbl.buf}
+  )
+
+  -- vim.keymap.set(
+  --   "n",
+  --   "d",
+  --   function()
+  --     vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
+  --     -- Handle "dd" keymap.
+  --     -- vim.keymap.set("o", "d", "$", {noremap = true, buffer = buftable.buf})
+  --     return "g@"
+  --   end,
+  --   {expr = true, noremap = true, buffer = tbl.buf}
+  -- )
+
+  vim.keymap.set(
+    "n",
     "d",
     function()
       vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
       -- Handle "dd" keymap.
-      -- vim.keymap.set("o", "d", "$", {noremap = true, buffer = buftable.buf})
+      vim.keymap.set("o", "d", "$", {noremap = true, nowait = true, buffer = tbl.buf})
+      vim.api.nvim_create_autocmd("ModeChanged", {
+        pattern = "o:*",
+        callback = function()
+          vim.keymap.del("o", "d", {buffer = tbl.buf})
+        end,
+        once = true
+      })
       return "g@"
     end,
     {expr = true, noremap = true, buffer = tbl.buf}
@@ -239,6 +280,14 @@ function ModeManager:add_normal_mode_keymaps()
   vim.keymap.set(
     "n",
     "<esc>",
+    function()
+      state.get_floating_window():close()
+    end,
+    {noremap = true, buffer = tbl.buf}
+  )
+  vim.keymap.set(
+    "n",
+    "q",
     function()
       state.get_floating_window():close()
     end,
@@ -268,13 +317,12 @@ function _G.bufhopper_delete_operator()
   end
 end
 
-
-
 function ModeManager:remove_normal_mode_keymaps()
   local tbl = state.get_buffer_table()
 
   pcall(vim.keymap.del, "n", "d", {buffer = tbl.buf})
   pcall(vim.keymap.del, "n", "<esc>", {buffer = tbl.buf})
+  pcall(vim.keymap.del, "n", "q", {buffer = tbl.buf})
 end
 
 -- function ModeManager:remove_delete_mode_keymaps()
