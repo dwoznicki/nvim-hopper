@@ -339,15 +339,14 @@ function StatusLine:draw()
   local hl_locs = {}
   local buf_lines = {} ---@type string[]
   local mode_indicator ---@type string
-  if mode == "jump" then
+  if mode == "normal" then
+    mode_indicator = "  Normal "
+    table.insert(hl_locs, {name = "BufhopperModeNormal", row = 0, col_start = 1, col_end = 9})
+  elseif mode == "jump" then
     mode_indicator = "  Jump "
     table.insert(hl_locs, {name = "BufhopperModeJump", row = 0, col_start = 1, col_end = 7})
-  elseif mode == "open" then
-    mode_indicator = "  Open "
-    table.insert(hl_locs, {name = "BufhopperModeOpen", row = 0, col_start = 1, col_end = 7})
-  elseif mode == "delete" then
-    mode_indicator = "  Delete "
-    table.insert(hl_locs, {name = "BufhopperModeDelete", row = 0, col_start = 1, col_end = 9})
+  else
+    vim.notify("Unrecognized mode: " .. mode, vim.log.levels.WARN)
   end
 
   local buflist = state.get_buffer_list()

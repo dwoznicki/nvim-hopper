@@ -31,7 +31,7 @@ M.presets = {
   },
 }
 
-M.reserved_keys = {"d", "g", "j", "k", "q"}
+M.reserved_keys = {}
 
 ---@param keyset BufhopperConfig.keyset
 ---@return string[]

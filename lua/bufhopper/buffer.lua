@@ -19,6 +19,7 @@ local M = {}
 ---@field buffers BufhopperBuffer[]
 ---@field page integer default = 0
 ---@field total_pages integer default = 1
+---@field buffers_by_key table<string, BufhopperBuffer | nil>
 ---@field create fun(): BufhopperBufferList
 ---@field remove_at_index fun(self: BufhopperBufferList, idx: integer): nil
 ---@field remove_in_index_range fun(self: BufhopperBufferList, start_idx: integer, end_idx: integer): nil
@@ -79,6 +80,10 @@ function BufferList:populate()
   local current_buf = state.get_prior_current_buf()
   local alternate_buf = state.get_prior_alternate_buf()
 
+  local buffers_by_key = {} ---@type table<string, BufhopperBuffer | nil>
+  for _, key in ipairs(keyset) do
+    buffers_by_key[key] = nil
+  end
   local buffers = {} ---@type BufhopperBuffer[]
   for _, buf in ipairs(bufs) do
     local project_file_path = filepath.get_path_from_project_root(vim.api.nvim_buf_get_name(buf))
@@ -114,12 +119,16 @@ function BufferList:populate()
       buf_indicators = buf_indicators,
     }
     table.insert(buffers, buffer)
+    if key ~= nil then
+      buffers_by_key[key] = buffer
+    end
   end
   table.sort(buffers, function(a, b)
     return a.buf < b.buf
   end)
   self.buffers = buffers
   self.pinned_buffers = {} -- TODO
+  self.buffers_by_key = buffers_by_key
 end
 
 function BufferList:remove_at_index(idx)
@@ -133,6 +142,7 @@ function BufferList:remove_at_index(idx)
   end
   vim.api.nvim_buf_delete(deleting_buffer.buf, {})
   table.remove(self.buffers, idx)
+  self.buffers_by_key[deleting_buffer.key] = nil
 end
 
 function BufferList:remove_in_index_range(start_idx, end_idx)
