@@ -255,7 +255,7 @@ function BufferTable:draw(options)
     table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
     col_start = col_end
     col_end = col_start + 1
-    table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
+    table.insert(hl_locs, {name = "BufhopperJumpKey", row = row, col_start = col_start, col_end = col_end})
 
     -- local col_start, col_end = 1, 2
     -- table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
