@@ -1,4 +1,3 @@
-local utils = require("bufhopper.utils")
 local state = require("bufhopper.state")
 
 ---@alias BufhopperMode "jump" | "normal"
@@ -236,6 +235,7 @@ end
 
 function ModeManager:add_normal_mode_keymaps()
   local tbl = state.get_buffer_table()
+  local config = state.get_config()
 
   vim.keymap.set(
     "n",
@@ -265,10 +265,17 @@ function ModeManager:add_normal_mode_keymaps()
       vim.o.operatorfunc = "v:lua.bufhopper_delete_operator"
       -- Handle "dd" keymap.
       vim.keymap.set("o", "d", "$", {noremap = true, nowait = true, buffer = tbl.buf})
+      -- Remove the "dd" keymap when mode changes back to normal.
       vim.api.nvim_create_autocmd("ModeChanged", {
-        pattern = "o:*",
+        pattern = "n:no",
         callback = function()
-          vim.keymap.del("o", "d", {buffer = tbl.buf})
+          -- Remove async to avoid canceling out the operator function call, which actually deletes
+          -- the buffer.
+          vim.schedule(
+            function()
+              vim.keymap.del("o", "d", {buffer = tbl.buf})
+            end
+          )
         end,
         once = true
       })
@@ -293,6 +300,71 @@ function ModeManager:add_normal_mode_keymaps()
     end,
     {noremap = true, buffer = tbl.buf}
   )
+
+  local open_buffer_keymaps = config.normal_mode.actions.open_buffer
+  if type(open_buffer_keymaps) == "string" then
+    open_buffer_keymaps = {open_buffer_keymaps}
+  end
+  for _, keymap in ipairs(open_buffer_keymaps) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      function()
+        local buffer = tbl:buffer_under_cursor()
+        if buffer ~= nil then
+          state.get_floating_window():close()
+          vim.api.nvim_set_current_buf(buffer.buf)
+        end
+      end,
+      {noremap = true, nowait = true, buffer = tbl.buf}
+    )
+  end
+
+  local vertical_split_buffer_keymaps = config.normal_mode.actions.vertical_split_buffer
+  if type(vertical_split_buffer_keymaps) == "string" then
+    vertical_split_buffer_keymaps = {vertical_split_buffer_keymaps}
+  end
+  for _, keymap in ipairs(vertical_split_buffer_keymaps) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      function()
+        local buffer = tbl:buffer_under_cursor()
+        if buffer ~= nil then
+          state.get_floating_window():close()
+          vim.cmd("vsplit")
+          local split_win = vim.api.nvim_get_current_win()
+          vim.api.nvim_win_set_buf(split_win, buffer.buf)
+          -- state.get_floating_window():close()
+          -- vim.api.nvim_set_current_buf(buffer.buf)
+        end
+      end,
+      {noremap = true, nowait = true, buffer = tbl.buf}
+    )
+  end
+
+  local horizontal_split_buffer_keymaps = config.normal_mode.actions.horizontal_split_buffer
+  if type(horizontal_split_buffer_keymaps) == "string" then
+    horizontal_split_buffer_keymaps = {horizontal_split_buffer_keymaps}
+  end
+  for _, keymap in ipairs(horizontal_split_buffer_keymaps) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      function()
+        local buffer = tbl:buffer_under_cursor()
+        if buffer ~= nil then
+          state.get_floating_window():close()
+          vim.cmd("split")
+          local split_win = vim.api.nvim_get_current_win()
+          vim.api.nvim_win_set_buf(split_win, buffer.buf)
+          -- state.get_floating_window():close()
+          -- vim.api.nvim_set_current_buf(buffer.buf)
+        end
+      end,
+      {noremap = true, nowait = true, buffer = tbl.buf}
+    )
+  end
 end
 
 function _G.bufhopper_delete_operator()
@@ -319,17 +391,36 @@ end
 
 function ModeManager:remove_normal_mode_keymaps()
   local tbl = state.get_buffer_table()
+  local config = state.get_config()
 
   pcall(vim.keymap.del, "n", "d", {buffer = tbl.buf})
   pcall(vim.keymap.del, "n", "<esc>", {buffer = tbl.buf})
   pcall(vim.keymap.del, "n", "q", {buffer = tbl.buf})
-end
 
--- function ModeManager:remove_delete_mode_keymaps()
---   local buftable = state.get_buffer_table()
---   pcall(vim.keymap.del, {"o", "n"}, "<esc>", {buffer = buftable.buf})
---   pcall(vim.keymap.del, "o", "d", {buffer = buftable.buf})
--- end
+  local open_buffer_keymaps = config.normal_mode.actions.open_buffer
+  if type(open_buffer_keymaps) == "string" then
+    open_buffer_keymaps = {open_buffer_keymaps}
+  end
+  for _, keymap in ipairs(open_buffer_keymaps) do
+    pcall(vim.keymap.del, "n", keymap, {buffer = tbl.buf})
+  end
+
+  local vertical_split_buffer_keymaps = config.normal_mode.actions.vertical_split_buffer
+  if type(vertical_split_buffer_keymaps) == "string" then
+    vertical_split_buffer_keymaps = {vertical_split_buffer_keymaps}
+  end
+  for _, keymap in ipairs(vertical_split_buffer_keymaps) do
+    pcall(vim.keymap.del, "n", keymap, {buffer = tbl.buf})
+  end
+
+  local horizontal_buffer_keymaps = config.normal_mode.actions.horizontal_split_buffer
+  if type(horizontal_buffer_keymaps) == "string" then
+    horizontal_buffer_keymaps = {horizontal_buffer_keymaps}
+  end
+  for _, keymap in ipairs(horizontal_buffer_keymaps) do
+    pcall(vim.keymap.del, "n", keymap, {buffer = tbl.buf})
+  end
+end
 
 M.ModeManager = ModeManager
 

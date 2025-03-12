@@ -72,6 +72,7 @@ M.FloatingWindow = FloatingWindow
 ---@field draw fun(self: BufhopperBufferTable, options?: BufhopperBufferTableDrawOptions): nil
 ---@field cursor_to_buf fun(self: BufhopperBufferTable, buf: integer): nil
 ---@field cursor_to_row fun(self: BufhopperBufferTable, row: integer): nil
+---@field buffer_under_cursor fun(self: BufhopperBufferTable): BufhopperBuffer | nil
 ---@field close fun(self: BufhopperBufferTable): nil
 local BufferTable = {}
 BufferTable.__index = BufferTable
@@ -289,6 +290,14 @@ end
 
 function BufferTable:cursor_to_row(row)
   vim.api.nvim_win_set_cursor(self.win, {row, 0})
+end
+
+function BufferTable:buffer_under_cursor()
+  local buffers = state.get_buffer_list().buffers
+  local cursor_pos = vim.api.nvim_win_get_cursor(self.win)
+  local buffer_idx = cursor_pos[1]
+  local buffer = buffers[buffer_idx] ---@type BufhopperBuffer | nil
+  return buffer
 end
 
 function BufferTable:close()
