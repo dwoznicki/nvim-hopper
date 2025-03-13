@@ -19,8 +19,8 @@ local M = {}
 ---@field actions BufhopperPaginationActionsConfig
 
 ---@class BufhopperPaginationActionsConfig
----@field next_page string[]
----@field prev_page string[]
+---@field next_page string
+---@field prev_page string
 
 ---@class BufhopperJumpModeConfig
 ---@field delay integer
@@ -31,9 +31,9 @@ local M = {}
 ---@field actions BufhopperNormalModeActionsConfig
 
 ---@class BufhopperNormalModeActionsConfig
----@field open_buffer string[]
----@field vertical_split_buffer string[]
----@field horizontal_split_buffer string[]
+---@field open_buffer string
+---@field vertical_split_buffer string
+---@field horizontal_split_buffer string
 
 ---@class BufhopperOptions
 ---@field default_mode? BufhopperMode
@@ -51,8 +51,8 @@ local M = {}
 ---@field actions? BufhopperPaginationActionsOptions
 
 ---@class BufhopperPaginationActionsOptions
----@field next_page? string | string[] Go to next page of buffers. default = "N"
----@field prev_page? string | string[] Go to previous page of buffers. default = "P"
+---@field next_page? string Go to next page of buffers. default = "N"
+---@field prev_page? string Go to previous page of buffers. default = "P"
 
 ---@class BufhopperJumpModeOptions
 ---@field delay? integer Delay in milliseconds before opening buffer. Set to 0 for no delay. default = 50
@@ -63,9 +63,9 @@ local M = {}
 ---@field actions? BufhopperNormalModeActionsOptions
 
 ---@class BufhopperNormalModeActionsOptions
----@field open_buffer? string | string[] Open buffer under cursor in main window. default = ["oo", "<cr>"]
----@field vertical_split_buffer? string | string[] Open buffer under cursor in vertical split. default = "ov"
----@field horizontal_split_buffer? string | string[] Open buffer under cursor in horizontal split. default = "oh"
+---@field open_buffer? string Open buffer under cursor in main window. default = ["oo", "<cr>"]
+---@field vertical_split_buffer? string Open buffer under cursor in vertical split. default = "ov"
+---@field horizontal_split_buffer? string Open buffer under cursor in horizontal split. default = "oh"
 
 
 function M.default_config()
@@ -79,9 +79,9 @@ function M.default_config()
     },
     normal_mode = {
       actions = {
-        open_buffer = {"oo", "<cr>"},
-        vertical_split_buffer = {"ov"},
-        horizontal_split_buffer = {"oh"},
+        open_buffer = "<cr>",
+        vertical_split_buffer = "ov",
+        horizontal_split_buffer = "oh",
       },
     },
     buffers = {
@@ -90,42 +90,12 @@ function M.default_config()
       pagination = {
         enabled = true,
         actions = {
-          next_page = {"N"},
-          prev_page = {"P"},
+          next_page = "N",
+          prev_page = "P",
         },
       },
     },
   }
-end
-
----Input options for actions accept both strings and lists of strings to simplify the user
----interface. It's much easier to work with standardized types, so this function normalizes
----input into a list.
----@param actions table<string, string | string[] | nil>
----@return nil
-local function normalize_action_keymaps(actions)
-  for name, keymaps in pairs(actions) do
-    if type(keymaps) == "string" then
-      actions[name] = {keymaps}
-    end
-  end
-end
-
----Normalize options in place.
----@param options BufhopperOptions
----@return nil
-function M.normalize_options(options)
-  if options.buffers
-    and options.buffers.pagination
-    and options.buffers.pagination.actions
-  then
-    normalize_action_keymaps(options.buffers.pagination.actions)
-  end
-  if options.normal_mode
-    and options.normal_mode.actions
-  then
-    normalize_action_keymaps(options.normal_mode.actions)
-  end
 end
 
 return M

@@ -318,11 +318,11 @@ M.BufferTable = BufferTable
 ---@field buf integer
 ---@field win integer
 ---@field mode BufhopperMode | nil
----@field attach fun(float: BufhopperFloatingWindow): BufhopperStatusLine
----@field draw fun(self: BufhopperStatusLine): nil
 local StatusLine = {}
 StatusLine.__index = StatusLine
 
+---@param float BufhopperFloatingWindow
+---@return BufhopperStatusLine
 function StatusLine.attach(float)
   local statline = {}
   setmetatable(statline, StatusLine)
@@ -356,45 +356,68 @@ function StatusLine:draw()
   ---@type {name: string, row: integer, col_start: integer, col_end: integer}[]
   local hl_locs = {}
   local buf_lines = {} ---@type string[]
-  local mode_indicator ---@type string
+  local mode_display ---@type string
   if mode == "normal" then
-    mode_indicator = "  Normal "
+    mode_display = "  Normal "
     table.insert(hl_locs, {name = "BufhopperModeNormal", row = 0, col_start = 1, col_end = 9})
   elseif mode == "jump" then
-    mode_indicator = "  Jump "
+    mode_display = "  Jump "
     table.insert(hl_locs, {name = "BufhopperModeJump", row = 0, col_start = 1, col_end = 7})
   else
     vim.notify("Unrecognized mode: " .. mode, vim.log.levels.WARN)
   end
 
   local buflist = state.get_buffer_list()
+  local conf = state.get_config()
   if buflist.total_pages > 1 then
-    local page_indicator = buflist.page + 1 .."/" .. buflist.total_pages .. " "
-    local pagination_indicators = "󰌥  prev, next 󰌒 "
+    local curr_page_display = buflist.page + 1 .. "/" .. buflist.total_pages
+    local prev_page_icon = " "
+    local prev_page_key = conf.buffers.pagination.actions.prev_page
+    -- local prev_page_indicator = "_" .. conf.buffers.pagination.actions.prev_page
+    local next_page_key = conf.buffers.pagination.actions.next_page
+    local next_page_icon = "  "
+    local pagination_display = prev_page_icon .. prev_page_key .. " " .. curr_page_display .. " " .. next_page_key .. next_page_icon
+    -- local pagination_indicators = "󰌥  prev, next 󰌒 "
+    -- local pagination_indicators = " " .. conf.buffers.pagination.actions.prev_page .. " " .. conf.buffers.pagination.actions.next_page .. "  "
     local win_width, _ = utils.get_win_dimensions()
-    local padding = string.rep(" ", win_width - vim.fn.strdisplaywidth(mode_indicator) - vim.fn.strdisplaywidth(page_indicator) - vim.fn.strdisplaywidth(pagination_indicators))
-    local prev_col_start = string.len(mode_indicator .. padding .. page_indicator)
-    local prev_col_end = prev_col_start + 10
-    local prev_hl_name ---@type string
+    local padding = string.rep(" ", win_width - vim.fn.strdisplaywidth(mode_display) - vim.fn.strdisplaywidth(pagination_display))
+    local prev_icon_col_start = string.len(mode_display .. padding)
+    -- local prev_col_end = prev_col_start + 10
+    local prev_icon_col_end = prev_icon_col_start + string.len(prev_page_icon)
+    local prev_key_col_start = prev_icon_col_end
+    local prev_key_col_end = prev_key_col_start + string.len(prev_page_key)
+    local prev_icon_hl_name ---@type string
+    local prev_key_hl_name ---@type string
     if buflist.page < 1 then
-      prev_hl_name = "BufhopperPaginationDisabled"
+      prev_icon_hl_name = "BufhopperPaginationDisabled"
+      prev_key_hl_name = "BufhopperPaginationKeyDisabled"
     else
-      prev_hl_name = "BufhopperPaginationEnabled"
+      prev_icon_hl_name = "BufhopperPaginationEnabled"
+      prev_key_hl_name = "BufhopperPaginationKeyEnabled"
     end
-    table.insert(hl_locs, {name = prev_hl_name, row = 0, col_start = prev_col_start, col_end = prev_col_end})
-    local next_col_start = prev_col_end + 2
-    local next_col_end = next_col_start + 10
-    local next_hl_name ---@type string
+    table.insert(hl_locs, {name = prev_icon_hl_name, row = 0, col_start = prev_icon_col_start, col_end = prev_icon_col_end})
+    table.insert(hl_locs, {name = prev_key_hl_name, row = 0, col_start = prev_key_col_start, col_end = prev_key_col_end})
+    -- local next_col_start = prev_col_end + 2
+    -- local next_col_end = next_col_start + 10
+    local next_key_col_start = prev_icon_col_end + string.len(curr_page_display) + 3
+    local next_key_col_end = next_key_col_start + string.len(next_page_key)
+    local next_icon_col_start = next_key_col_end
+    local next_icon_col_end = next_icon_col_start + string.len(next_page_icon)
+    local next_key_hl_name ---@type string
+    local next_icon_hl_name ---@type string
     if buflist.page + 1 >= buflist.total_pages then
-      next_hl_name = "BufhopperPaginationDisabled"
+      next_key_hl_name = "BufhopperPaginationKeyDisabled"
+      next_icon_hl_name = "BufhopperPaginationDisabled"
     else
-      next_hl_name = "BufhopperPaginationEnabled"
+      next_key_hl_name = "BufhopperPaginationKeyEnabled"
+      next_icon_hl_name = "BufhopperPaginationEnabled"
     end
-    table.insert(hl_locs, {name = next_hl_name, row = 0, col_start = next_col_start, col_end = next_col_end})
-    table.insert(buf_lines, mode_indicator .. padding .. page_indicator .. pagination_indicators)
+    table.insert(hl_locs, {name = next_key_hl_name, row = 0, col_start = next_key_col_start, col_end = next_key_col_end})
+    table.insert(hl_locs, {name = next_icon_hl_name, row = 0, col_start = next_icon_col_start, col_end = next_icon_col_end})
+    table.insert(buf_lines, mode_display .. padding .. pagination_display)
     buflist:add_pagination_keymaps()
   else
-    table.insert(buf_lines, mode_indicator)
+    table.insert(buf_lines, mode_display)
   end
 
   vim.api.nvim_set_option_value("modifiable", true, {buf = self.buf})

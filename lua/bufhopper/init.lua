@@ -1,6 +1,6 @@
 local actions = require("bufhopper.actions")
 local state = require("bufhopper.state")
-local conf = require("bufhopper.config")
+local config = require("bufhopper.config")
 
 local M = {}
 
@@ -11,13 +11,11 @@ M.close = actions.close
 ---Setup Bufhopper.
 ---@param options? BufhopperOptions
 function M.setup(options)
-  local config = conf.default_config()
+  local conf = config.default_config()
   if options ~= nil then
-    local options_copy = vim.tbl_deep_extend("force", {}, options) ---@type BufhopperOptions
-    conf.normalize_options(options_copy)
-    config = vim.tbl_deep_extend("force", {}, config, options_copy) ---@type BufhopperConfig
+    conf = vim.tbl_deep_extend("force", {}, conf, options) ---@type BufhopperConfig
   end
-  state.set_config(config)
+  state.set_config(conf)
   require("bufhopper.highlight").setup()
   require("bufhopper.usercommand").setup()
   require("bufhopper.mode").ModeManager.create()

@@ -153,56 +153,50 @@ end
 
 function BufferList:add_pagination_keymaps()
   local tbl = state.get_buffer_table()
-  local config = state.get_config()
+  local conf = state.get_config()
 
-  local next_page_keymaps = config.buffers.pagination.actions.next_page
-  for _, keymap in ipairs(next_page_keymaps) do
-    vim.keymap.set(
-      "n",
-      keymap,
-      function()
-        local next_page = self.page + 1
-        vim.print("next_page", next_page)
-        if next_page >= self.total_pages then
-          return
-        end
-        self.page = next_page
-        self:populate()
-        state.get_buffer_table():draw()
-        state.get_status_line():draw()
-        local mode_manager = state.get_mode_manager()
-        if mode_manager.mode == "jump" then
-          mode_manager:remove_jump_mode_keymaps()
-          mode_manager:add_jump_mode_keymaps()
-        end
-      end,
-      {silent = true, nowait = true, buffer = tbl.buf}
-    )
-  end
-  local prev_page_keymaps = config.buffers.pagination.actions.prev_page
-  for _, keymap in ipairs(prev_page_keymaps) do
-    vim.keymap.set(
-      "n",
-      keymap,
-      function()
-        local prev_page = self.page - 1
-        vim.print("prev_page", prev_page)
-        if prev_page < 0 then
-          return
-        end
-        self.page = prev_page
-        self:populate()
-        state.get_buffer_table():draw()
-        state.get_status_line():draw()
-        local mode_manager = state.get_mode_manager()
-        if mode_manager.mode == "jump" then
-          mode_manager:remove_jump_mode_keymaps()
-          mode_manager:add_jump_mode_keymaps()
-        end
-      end,
-      {silent = true, nowait = true, buffer = tbl.buf}
-    )
-  end
+  vim.keymap.set(
+    "n",
+    conf.buffers.pagination.actions.next_page,
+    function()
+      local next_page = self.page + 1
+      vim.print("next_page", next_page)
+      if next_page >= self.total_pages then
+        return
+      end
+      self.page = next_page
+      self:populate()
+      state.get_buffer_table():draw()
+      state.get_status_line():draw()
+      local mode_manager = state.get_mode_manager()
+      if mode_manager.mode == "jump" then
+        mode_manager:remove_jump_mode_keymaps()
+        mode_manager:add_jump_mode_keymaps()
+      end
+    end,
+    {silent = true, nowait = true, buffer = tbl.buf}
+  )
+  vim.keymap.set(
+    "n",
+    conf.buffers.pagination.actions.prev_page,
+    function()
+      local prev_page = self.page - 1
+      vim.print("prev_page", prev_page)
+      if prev_page < 0 then
+        return
+      end
+      self.page = prev_page
+      self:populate()
+      state.get_buffer_table():draw()
+      state.get_status_line():draw()
+      local mode_manager = state.get_mode_manager()
+      if mode_manager.mode == "jump" then
+        mode_manager:remove_jump_mode_keymaps()
+        mode_manager:add_jump_mode_keymaps()
+      end
+    end,
+    {silent = true, nowait = true, buffer = tbl.buf}
+  )
 end
 
 M.BufferList = BufferList
