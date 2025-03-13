@@ -255,7 +255,14 @@ function BufferTable:draw(options)
     table.insert(hl_locs, {name = "BufhopperFileName", row = row, col_start = col_start, col_end = col_end})
     col_start = col_end
     col_end = col_start + 1
-    table.insert(hl_locs, {name = "BufhopperJumpKey", row = row, col_start = col_start, col_end = col_end})
+    local mode = state.get_mode_manager().mode
+    local hl_jump_key_name ---@type string
+    if mode == "normal" then
+      hl_jump_key_name = "BufhopperJumpKeyDisabled"
+    else
+      hl_jump_key_name = "BufhopperJumpKey"
+    end
+    table.insert(hl_locs, {name = hl_jump_key_name, row = row, col_start = col_start, col_end = col_end})
 
     -- local col_start, col_end = 1, 2
     -- table.insert(hl_locs, {name = "BufhopperKey", row = row, col_start = col_start, col_end = col_end})
@@ -301,7 +308,9 @@ function BufferTable:buffer_under_cursor()
 end
 
 function BufferTable:close()
-  vim.api.nvim_win_close(self.win, true)
+  if vim.api.nvim_win_is_valid(self.win) then
+    vim.api.nvim_win_close(self.win, true)
+  end
 end
 
 M.BufferTable = BufferTable

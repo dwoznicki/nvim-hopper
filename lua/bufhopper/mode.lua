@@ -34,6 +34,7 @@ function ModeManager:set_mode(mode)
   self.mode = mode
   vim.schedule(
     function()
+      state.get_buffer_table():draw()
       state.get_status_line():draw()
     end
   )

@@ -15,6 +15,7 @@ local function set_highlights()
 
     vim.api.nvim_set_hl(0, "BufhopperFileName", {fg = kanagawa_colors.palette.fujiWhite})
     vim.api.nvim_set_hl(0, "BufhopperJumpKey", {fg = kanagawa_colors.palette.waveRed})
+    vim.api.nvim_set_hl(0, "BufhopperJumpKeyDisabled", {fg = "#636363"})
   end
   vim.api.nvim_set_hl(0, "BufhopperPaginationEnabled", {fg = "#ffffff"})
   vim.api.nvim_set_hl(0, "BufhopperPaginationDisabled", {fg = "#aaaaaa"})
