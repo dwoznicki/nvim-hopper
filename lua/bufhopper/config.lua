@@ -4,8 +4,6 @@ local M = {}
 ---@alias BufhopperConfig.next_key "sequential" | "filename" | fun(context: BufhopperNextKeyContext): string | nil
 
 ---@class BufhopperConfig
----@field keyset BufhopperConfig.keyset
----@field next_key BufhopperConfig.next_key
 ---@field default_mode BufhopperMode
 ---@field jump_mode BufhopperJumpModeConfig
 ---@field normal_mode BufhopperNormalModeConfig
@@ -14,22 +12,30 @@ local M = {}
 ---@class BufhopperBuffersConfig
 ---@field show_unloaded boolean
 ---@field show_hidden boolean
----@field paginate boolean
+---@field pagination BufhopperPaginationConfig
+
+---@class BufhopperPaginationConfig
+---@field enabled boolean
+---@field actions BufhopperPaginationActionsConfig
+
+---@class BufhopperPaginationActionsConfig
+---@field next_page string[]
+---@field prev_page string[]
 
 ---@class BufhopperJumpModeConfig
 ---@field delay integer
+---@field keyset BufhopperConfig.keyset
+---@field next_key BufhopperConfig.next_key
 
 ---@class BufhopperNormalModeConfig
 ---@field actions BufhopperNormalModeActionsConfig
 
 ---@class BufhopperNormalModeActionsConfig
----@field open_buffer string | string[]
----@field vertical_split_buffer string | string[]
----@field horizontal_split_buffer string | string[]
+---@field open_buffer string[]
+---@field vertical_split_buffer string[]
+---@field horizontal_split_buffer string[]
 
 ---@class BufhopperOptions
----@field keyset? BufhopperConfig.keyset
----@field next_key? BufhopperConfig.next_key
 ---@field default_mode? BufhopperMode
 ---@field jump_mode? BufhopperJumpModeOptions
 ---@field normal_mode? BufhopperNormalModeOptions
@@ -38,13 +44,23 @@ local M = {}
 ---@class BufhopperBuffersOptions
 ---@field show_unloaded? boolean default = true
 ---@field show_hidden? boolean default = false
----@field paginate? boolean default = true
+---@field pagination? BufhopperPaginationOptions
+
+---@class BufhopperPaginationOptions
+---@field enabled? boolean default = true
+---@field actions? BufhopperPaginationActionsOptions
+
+---@class BufhopperPaginationActionsOptions
+---@field next_page? string | string[] Go to next page of buffers. default = "N"
+---@field prev_page? string | string[] Go to previous page of buffers. default = "P"
 
 ---@class BufhopperJumpModeOptions
 ---@field delay? integer Delay in milliseconds before opening buffer. Set to 0 for no delay. default = 50
+---@field keyset? BufhopperConfig.keyset
+---@field next_key? BufhopperConfig.next_key
 
 ---@class BufhopperNormalModeOptions
----@field keys? BufhopperNormalModeActionsOptions
+---@field actions? BufhopperNormalModeActionsOptions
 
 ---@class BufhopperNormalModeActionsOptions
 ---@field open_buffer? string | string[] Open buffer under cursor in main window. default = ["oo", "<cr>"]
@@ -52,28 +68,64 @@ local M = {}
 ---@field horizontal_split_buffer? string | string[] Open buffer under cursor in horizontal split. default = "oh"
 
 
----@return BufhopperConfig
 function M.default_config()
+  ---@type BufhopperConfig
   return {
-    keyset = "alphanumeric",
-    next_key = "filename",
     default_mode = "jump",
     jump_mode = {
       delay = 50,
+      keyset = "alphanumeric",
+      next_key = "filename",
     },
     normal_mode = {
       actions = {
         open_buffer = {"oo", "<cr>"},
-        vertical_split_buffer = "ov",
-        horizontal_split_buffer = "oh",
+        vertical_split_buffer = {"ov"},
+        horizontal_split_buffer = {"oh"},
       },
     },
     buffers = {
       show_unloaded = true,
       show_hidden = false,
-      paginate = true,
+      pagination = {
+        enabled = true,
+        actions = {
+          next_page = {"N"},
+          prev_page = {"P"},
+        },
+      },
     },
   }
+end
+
+---Input options for actions accept both strings and lists of strings to simplify the user
+---interface. It's much easier to work with standardized types, so this function normalizes
+---input into a list.
+---@param actions table<string, string | string[] | nil>
+---@return nil
+local function normalize_action_keymaps(actions)
+  for name, keymaps in pairs(actions) do
+    if type(keymaps) == "string" then
+      actions[name] = {keymaps}
+    end
+  end
+end
+
+---Normalize options in place.
+---@param options BufhopperOptions
+---@return nil
+function M.normalize_options(options)
+  if options.buffers
+    and options.buffers.pagination
+    and options.buffers.pagination.actions
+  then
+    normalize_action_keymaps(options.buffers.pagination.actions)
+  end
+  if options.normal_mode
+    and options.normal_mode.actions
+  then
+    normalize_action_keymaps(options.normal_mode.actions)
+  end
 end
 
 return M

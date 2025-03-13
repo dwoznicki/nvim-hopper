@@ -73,7 +73,6 @@ M.FloatingWindow = FloatingWindow
 ---@field cursor_to_buf fun(self: BufhopperBufferTable, buf: integer): nil
 ---@field cursor_to_row fun(self: BufhopperBufferTable, row: integer): nil
 ---@field buffer_under_cursor fun(self: BufhopperBufferTable): BufhopperBuffer | nil
----@field close fun(self: BufhopperBufferTable): nil
 local BufferTable = {}
 BufferTable.__index = BufferTable
 

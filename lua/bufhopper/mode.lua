@@ -303,9 +303,6 @@ function ModeManager:add_normal_mode_keymaps()
   )
 
   local open_buffer_keymaps = config.normal_mode.actions.open_buffer
-  if type(open_buffer_keymaps) == "string" then
-    open_buffer_keymaps = {open_buffer_keymaps}
-  end
   for _, keymap in ipairs(open_buffer_keymaps) do
     vim.keymap.set(
       "n",
@@ -322,9 +319,6 @@ function ModeManager:add_normal_mode_keymaps()
   end
 
   local vertical_split_buffer_keymaps = config.normal_mode.actions.vertical_split_buffer
-  if type(vertical_split_buffer_keymaps) == "string" then
-    vertical_split_buffer_keymaps = {vertical_split_buffer_keymaps}
-  end
   for _, keymap in ipairs(vertical_split_buffer_keymaps) do
     vim.keymap.set(
       "n",
@@ -345,9 +339,6 @@ function ModeManager:add_normal_mode_keymaps()
   end
 
   local horizontal_split_buffer_keymaps = config.normal_mode.actions.horizontal_split_buffer
-  if type(horizontal_split_buffer_keymaps) == "string" then
-    horizontal_split_buffer_keymaps = {horizontal_split_buffer_keymaps}
-  end
   for _, keymap in ipairs(horizontal_split_buffer_keymaps) do
     vim.keymap.set(
       "n",
@@ -399,25 +390,16 @@ function ModeManager:remove_normal_mode_keymaps()
   pcall(vim.keymap.del, "n", "q", {buffer = tbl.buf})
 
   local open_buffer_keymaps = config.normal_mode.actions.open_buffer
-  if type(open_buffer_keymaps) == "string" then
-    open_buffer_keymaps = {open_buffer_keymaps}
-  end
   for _, keymap in ipairs(open_buffer_keymaps) do
     pcall(vim.keymap.del, "n", keymap, {buffer = tbl.buf})
   end
 
   local vertical_split_buffer_keymaps = config.normal_mode.actions.vertical_split_buffer
-  if type(vertical_split_buffer_keymaps) == "string" then
-    vertical_split_buffer_keymaps = {vertical_split_buffer_keymaps}
-  end
   for _, keymap in ipairs(vertical_split_buffer_keymaps) do
     pcall(vim.keymap.del, "n", keymap, {buffer = tbl.buf})
   end
 
   local horizontal_buffer_keymaps = config.normal_mode.actions.horizontal_split_buffer
-  if type(horizontal_buffer_keymaps) == "string" then
-    horizontal_buffer_keymaps = {horizontal_buffer_keymaps}
-  end
   for _, keymap in ipairs(horizontal_buffer_keymaps) do
     pcall(vim.keymap.del, "n", keymap, {buffer = tbl.buf})
   end

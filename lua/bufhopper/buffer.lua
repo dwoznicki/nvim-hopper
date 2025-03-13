@@ -47,7 +47,7 @@ function BufferList:populate()
     end
   end
 
-  if config.buffers.paginate then
+  if config.buffers.pagination.enabled then
     local _, win_height = utils.get_win_dimensions()
     local page_size = win_height - 3
     self.total_pages = math.ceil(#bufs / page_size)
@@ -61,7 +61,7 @@ function BufferList:populate()
     bufs = vim.list_slice(bufs, page_start, page_end)
   end
 
-  local keyset = keysets.determine_keyset(config.keyset)
+  local keyset = keysets.determine_keyset(config.jump_mode.keyset)
 
   local prev_key = nil ---@type string | nil
   local mapped_keys = {} ---@type table<string, integer>
@@ -93,13 +93,13 @@ function BufferList:populate()
     next_key_context.file_name = file_name
 
     local key = nil ---@type string | nil
-    if type(config.next_key) == "function" then
+    if type(config.jump_mode.next_key) == "function" then
       --- LuaLS gets this wrong.
       ---@diagnostic disable-next-line: cast-local-type
-      key = config.next_key(next_key_context)
-    elseif config.next_key == "filename" then
+      key = config.jump_mode.next_key(next_key_context)
+    elseif config.jump_mode.next_key == "filename" then
       key = keysets.next_key_filename(next_key_context)
-    elseif config.next_key == "sequential" then
+    elseif config.jump_mode.next_key == "sequential" then
       key = keysets.next_key_sequential(next_key_context)
       next_key_context.keyset_index = next_key_context.keyset_index + 1
     end
@@ -152,40 +152,57 @@ function BufferList:remove_in_index_range(start_idx, end_idx)
 end
 
 function BufferList:add_pagination_keymaps()
-  local buftable = state.get_buffer_table()
+  local tbl = state.get_buffer_table()
+  local config = state.get_config()
 
-  vim.keymap.set(
-    "n",
-    "<tab>",
-    function()
-      local next_page = self.page + 1
-      vim.print("next_page", next_page)
-      if next_page >= self.total_pages then
-        return
-      end
-      self.page = next_page
-      self:populate()
-      state.get_buffer_table():draw()
-      state.get_status_line():draw()
-    end,
-    {silent = true, nowait = true, buffer = buftable.buf}
-  )
-  vim.keymap.set(
-    "n",
-    "<S-tab>",
-    function()
-      local prev_page = self.page - 1
-      vim.print("prev_page", prev_page)
-      if prev_page < 0 then
-        return
-      end
-      self.page = prev_page
-      self:populate()
-      state.get_buffer_table():draw()
-      state.get_status_line():draw()
-    end,
-    {silent = true, nowait = true, buffer = buftable.buf}
-  )
+  local next_page_keymaps = config.buffers.pagination.actions.next_page
+  for _, keymap in ipairs(next_page_keymaps) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      function()
+        local next_page = self.page + 1
+        vim.print("next_page", next_page)
+        if next_page >= self.total_pages then
+          return
+        end
+        self.page = next_page
+        self:populate()
+        state.get_buffer_table():draw()
+        state.get_status_line():draw()
+        local mode_manager = state.get_mode_manager()
+        if mode_manager.mode == "jump" then
+          mode_manager:remove_jump_mode_keymaps()
+          mode_manager:add_jump_mode_keymaps()
+        end
+      end,
+      {silent = true, nowait = true, buffer = tbl.buf}
+    )
+  end
+  local prev_page_keymaps = config.buffers.pagination.actions.prev_page
+  for _, keymap in ipairs(prev_page_keymaps) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      function()
+        local prev_page = self.page - 1
+        vim.print("prev_page", prev_page)
+        if prev_page < 0 then
+          return
+        end
+        self.page = prev_page
+        self:populate()
+        state.get_buffer_table():draw()
+        state.get_status_line():draw()
+        local mode_manager = state.get_mode_manager()
+        if mode_manager.mode == "jump" then
+          mode_manager:remove_jump_mode_keymaps()
+          mode_manager:add_jump_mode_keymaps()
+        end
+      end,
+      {silent = true, nowait = true, buffer = tbl.buf}
+    )
+  end
 end
 
 M.BufferList = BufferList
