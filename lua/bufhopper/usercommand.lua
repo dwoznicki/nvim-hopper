@@ -1,15 +1,23 @@
-local Actions = require("bufhopper.actions")
-
 local M = {}
 
 local function handle_command(opts)
   local subcommand = opts.fargs[1]
   if subcommand == "open" then
-    Actions.open()
+    error("TODO")
   elseif subcommand == "close" then
-    Actions.close()
+    error("TODO")
   elseif subcommand == "delete_other_buffers" then
-    Actions.delete_other_buffers()
+    error("TODO")
+  elseif subcommand == "init_datastore" then
+    require("bufhopper.datastore").init("/tmp/hopper.db")
+  elseif subcommand == "insert" then
+    local conn = require("bufhopper.datastore").Connection.new("/tmp/hopper.db")
+    local changed = conn:exec_update("INSERT OR REPLACE INTO projects (path) VALUES (?)", {"/abc"})
+    vim.print("changed = " .. changed)
+  elseif subcommand == "select" then
+    local conn = require("bufhopper.datastore").Connection.new("/tmp/hopper.db")
+    local results = conn:exec_query("SELECT * FROM projects")
+    vim.print(results)
   else
     print("Unrecognized subcommand: " .. (subcommand or "nil"))
   end
@@ -20,6 +28,9 @@ local function complete_subcommand(_, _, _)
     "open",
     "close",
     "delete_other_buffers",
+    "init_datastore",
+    "insert",
+    "select",
   }
 end
 
