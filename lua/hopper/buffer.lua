@@ -1,7 +1,7 @@
-local state = require("bufhopper.state")
-local keysets = require("bufhopper.keysets")
-local filepath = require("bufhopper.filepath")
-local utils = require("bufhopper.utils")
+local state = require("hopper.state")
+local keysets = require("hopper.keysets")
+local filepath = require("hopper.filepath")
+local utils = require("hopper.utils")
 local set = utils.set
 
 local M = {}

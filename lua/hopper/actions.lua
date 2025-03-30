@@ -1,6 +1,6 @@
-local state = require("bufhopper.state")
-local view = require("bufhopper.view")
-local buffer = require("bufhopper.buffer")
+local state = require("hopper.state")
+local view = require("hopper.view")
+local buffer = require("hopper.buffer")
 
 local M = {}
 

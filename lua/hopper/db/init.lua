@@ -1,4 +1,4 @@
-local sqlite = require("bufhopper.db.sqlite")
+local sqlite = require("hopper.db.sqlite")
 
 local M = {}
 

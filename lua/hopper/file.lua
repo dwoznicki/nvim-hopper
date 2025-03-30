@@ -1,4 +1,4 @@
-local db = require("bufhopper.db.sqlite")
+local db = require("lua.hopperr.db.sqlite")
 
 local M = {}
 
@@ -47,7 +47,7 @@ function QuickFileList:populate()
 end
 
 function QuickFileList:_populate_from_datastore()
-  local datastore = state.get_datastore()
+  local datastore = db.get_datastore()
   for _, item in ipairs(datastore:get_quick_files(self.project)) do
     local path, keymap = item[1], item[2]
     local qfile = QuickFile.new(path, keymap)
@@ -69,10 +69,10 @@ function QuickFileList:_populate_from_datastore()
 end
 
 function QuickFileList:_populate_from_open_buffers()
-  local conf = state.get_config()
+  local opts = require("hopper.options").get_options()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    if (vim.api.nvim_buf_is_loaded(buf) or conf.buffers.show_unloaded)
-      and (vim.bo[buf].buflisted or conf.buffers.show_hidden)
+    if (vim.api.nvim_buf_is_loaded(buf) or opts.buffers.show_unloaded)
+      and (vim.bo[buf].buflisted or opts.buffers.show_hidden)
     then
       local full_path = vim.api.nvim_buf_get_name(buf)
       if string.sub(full_path, 1, #self.project) == self.project then

@@ -1,4 +1,4 @@
-local filepath = require("bufhopper.filepath")
+local filepath = require("hopper.filepath")
 
 describe("filepath utilities", function()
   describe("getting path from project root", function()

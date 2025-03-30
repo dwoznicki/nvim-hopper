@@ -33,4 +33,19 @@ function M.set(list)
   return set
 end
 
+---@generic T
+---@param tbl `T`
+---@return T
+function M.readonly(tbl)
+  local proxy = {}
+  local metatbl = {
+    __index = tbl,
+    __newindex = function(t, key, val)
+      error("Attempted to update a readonly table.", 2)
+    end
+  }
+  setmetatable(proxy, metatbl)
+  return proxy
+end
+
 return M

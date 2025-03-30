@@ -1,5 +1,5 @@
-local utils = require("bufhopper.utils")
-local state = require("bufhopper.state")
+local utils = require("hopper.utils")
+local state = require("hopper.state")
 
 local M = {}
 
