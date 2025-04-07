@@ -6,7 +6,7 @@ local M = {}
 local datastore = nil
 
 ---@return hopper.SqlDatastore
-function M.get_datastore()
+function M.datastore()
   if datastore == nil then
     datastore = sqlite.SqlDatastore.new(sqlite.DEFAULT_DB_PATH)
     datastore:init()

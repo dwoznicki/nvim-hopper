@@ -244,9 +244,8 @@ function SqlDatastore:init()
         project TEXT NOT NULL,
         path TEXT NOT NULL,
         keymap TEXT NOT NULL,
+        key_indexes_json TEXT NOT NULL CHECK (json_validate(key_indexes)),
         created INTEGER NOT NULL,
-        last_used INTEGER NOT NULL,
-        is_edited INTEGER NOT NULL,
         UNIQUE (project, path),
         UNIQUE (project, keymap)
       );
@@ -261,7 +260,7 @@ end
 function SqlDatastore:get_quick_files(project)
   if self.select_qfiles_stmt == nil then
     self.select_qfiles_stmt = PreparedStatement.new([[
-      SELECT path, keymap FROM quick_files WHERE project = ? ORDER BY last_used DESC
+      SELECT path, keymap, key_indexes_json FROM quick_files WHERE project = ? ORDER BY last_used DESC
     ]], self.conn)
   end
   local results = self.select_qfiles_stmt:exec_query({project})
