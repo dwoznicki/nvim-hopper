@@ -7,6 +7,7 @@ local M = {}
 ---@field keymap string
 local QuickFile = {}
 QuickFile.__index = QuickFile
+M.QuickFile = QuickFile
 
 ---@param path string
 ---@param keymap string
@@ -19,8 +20,6 @@ function QuickFile.new(path, keymap)
   return qfile
 end
 
-M.QuickFile = QuickFile
-
 ---@class hopper.QuickFileList
 ---@field project string
 ---@field files hopper.QuickFile[]
@@ -29,6 +28,7 @@ M.QuickFile = QuickFile
 ---@field files_by_path table<string, hopper.QuickFile>
 local QuickFileList = {}
 QuickFileList.__index = QuickFileList
+M.QuickFileList = QuickFileList
 
 ---@param project string
 function QuickFileList.new(project)

@@ -89,6 +89,7 @@ M.DEFAULT_DB_PATH = "/tmp/hopper.db"
 ---@field sqlite_conn ffi.cdata*
 local Connection = {}
 Connection.__index = Connection
+M.Connection = Connection
 
 ---@param path string
 function Connection.new(path)
@@ -112,14 +113,13 @@ function Connection:close()
   end
 end
 
-M.Connection = Connection
-
 ---@class hopper.PreparedStatement
 ---@field sql string
 ---@field conn hopper.Connection
 ---@field sqlite_stmt ffi.cdata*
 local PreparedStatement = {}
 PreparedStatement.__index = PreparedStatement
+M.PreparedStatement = PreparedStatement
 
 ---@param sql string
 ---@param conn hopper.Connection
@@ -213,9 +213,6 @@ function PreparedStatement:close()
   end
 end
 
-
-M.PreparedStatement = PreparedStatement
-
 ---@class hopper.SqlDatastore
 ---@field conn hopper.Connection
 ---@field create_tables_stmt hopper.PreparedStatement | nil
@@ -227,6 +224,7 @@ M.PreparedStatement = PreparedStatement
 ---@field update_usage_stmt hopper.PreparedStatement | nil
 local SqlDatastore = {}
 SqlDatastore.__index = SqlDatastore
+M.SqlDatastore = SqlDatastore
 
 ---@param path string
 function SqlDatastore.new(path)
@@ -244,7 +242,7 @@ function SqlDatastore:init()
         project TEXT NOT NULL,
         path TEXT NOT NULL,
         keymap TEXT NOT NULL,
-        key_indexes_json TEXT NOT NULL CHECK (json_validate(key_indexes)),
+        key_indexes_json TEXT NOT NULL CHECK (json_validate(key_indexes_json)),
         created INTEGER NOT NULL,
         UNIQUE (project, path),
         UNIQUE (project, keymap)
@@ -270,8 +268,8 @@ end
 ---@param project string
 ---@param path string
 ---@param keymap string
----@param is_edited boolean
-function SqlDatastore:set_quick_file(project, path, keymap, is_edited)
+---@param key_indexes_json string
+function SqlDatastore:set_quick_file(project, path, keymap, key_indexes_json)
   if self.select_qfile_id_by_path_stmt == nil then
     self.select_qfile_id_by_path_stmt = PreparedStatement.new([[
       SELECT id FROM quick_files WHERE project = ? AND path = ?
@@ -281,18 +279,18 @@ function SqlDatastore:set_quick_file(project, path, keymap, is_edited)
   if #results > 0 then
     if self.insert_qfile_stmt == nil then
       self.insert_qfile_stmt = PreparedStatement.new([[
-        INSERT INTO quick_files (project, path, keymap, is_edited, created, last_used)
-        VALUES (?, ?, ?, ?, unixepoch(), unixepoch())
+        INSERT INTO quick_files (project, path, keymap, key_indexes_json, created)
+        VALUES (?, ?, ?, ?, unixepoch())
       ]], self.conn)
     end
-    self.insert_qfile_stmt:exec_update({project, path, keymap, is_edited})
+    self.insert_qfile_stmt:exec_update({project, path, keymap, key_indexes_json})
   else
     if self.update_qfile_stmt == nil then
       self.update_qfile_stmt = PreparedStatement.new([[
-        UPDATE quick_files SET keymap = ?, is_edited = ? WHERE id = ?
+        UPDATE quick_files SET keymap = ?, key_indexes_json = ? WHERE id = ?
       ]], self.conn)
     end
-    self.update_qfile_stmt:exec_update({keymap, is_edited, results[0][0]})
+    self.update_qfile_stmt:exec_update({keymap, key_indexes_json, results[0][0]})
   end
 end
 
@@ -307,17 +305,15 @@ function SqlDatastore:remove_quick_file(project, path)
   self.delete_qfile_stmt:exec_update({project, path})
 end
 
----@param project string
----@param keymap string
-function SqlDatastore:track_quick_file_usage(project, keymap)
-  if self.update_usage_stmt == nil then
-    self.update_usage_stmt = PreparedStatement.new([[
-      UPDATE quick_files SET last_used = unixepoch() WHERE project = ? AND keymap = ?
-    ]], self.conn)
-  end
-  self.update_usage_stmt:exec_update({project, keymap})
-end
-
-M.SqlDatastore = SqlDatastore
+-- ---@param project string
+-- ---@param keymap string
+-- function SqlDatastore:track_quick_file_usage(project, keymap)
+--   if self.update_usage_stmt == nil then
+--     self.update_usage_stmt = PreparedStatement.new([[
+--       UPDATE quick_files SET last_used = unixepoch() WHERE project = ? AND keymap = ?
+--     ]], self.conn)
+--   end
+--   self.update_usage_stmt:exec_update({project, keymap})
+-- end
 
 return M
