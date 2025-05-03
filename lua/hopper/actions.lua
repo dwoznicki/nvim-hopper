@@ -1,3 +1,13 @@
+local M = {}
+
+function M.choose_keymap()
+  local path = require("hopper.filepath").get_path_from_project_root(vim.api.nvim_buf_get_name(0))
+  local keymap_float = require("hopper.view.keymap_float").instance()
+  keymap_float:open("x", path)
+end
+
+return M
+
 -- local state = require("hopper.state")
 -- local view = require("hopper.view")
 -- local buffer = require("hopper.buffer")

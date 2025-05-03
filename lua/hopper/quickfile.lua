@@ -141,7 +141,7 @@ end
 ---@param allowed_keys table<string, any>
 ---@param assigned_keymaps table<string, any>
 ---@return string, [integer, integer, integer, integer]
-function QuickFileList.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, assigned_keymaps)
+function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, assigned_keymaps)
   local tried_first_keys = {} ---@type table<string, true>
 
   -- Try to get the first letter of the filename as the first keymap letter.

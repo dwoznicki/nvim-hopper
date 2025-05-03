@@ -50,6 +50,7 @@ M._options = nil
 
 ---@param opts hopper.Options | nil
 function M.set_options(opts)
+  opts = opts or {}
   M._options = vim.tbl_deep_extend("force", {}, opts, M.default_options) ---@type hopper.OptionsFull
 end
 
