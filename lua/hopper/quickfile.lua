@@ -225,4 +225,85 @@ function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, 
   error("Failed to find a keymap for " .. vim.iter(path_tokens):join("/"))
 end
 
+---@param path string
+---@param available_width integer
+---@return string[] truncated_path_tokens
+function M.truncate_path(path, available_width)
+  local path_tokens = vim.split(path, "/")
+  local truncated_path_tokens = {} ---@type string[]
+  for i = #path_tokens, 1, -1 do
+    local path_token = path_tokens[i]
+    local text_width = vim.fn.strdisplaywidth(path_token)
+    if i ~= 1 then
+      -- Account for dir separator.
+      text_width = text_width + 1
+    end
+    local next_available_width = available_width - text_width
+    if next_available_width < 0 then
+      path_token = "…"
+      text_width = vim.fn.strdisplaywidth(path_token)
+      if i ~= 1 then
+        text_width = text_width + 1
+      end
+      next_available_width = available_width - text_width
+      if next_available_width < 0 then
+        -- We've reached the hard limit on horizontal space. There's not even enough room for the
+        -- ellipsis, so remove the previous path token to make room.
+        table.remove(truncated_path_tokens, i - 1)
+        break
+      end
+    end
+    if next_available_width < 0 then
+      break
+    end
+    available_width = next_available_width
+    table.insert(truncated_path_tokens, 1, path_token)
+  end
+  return truncated_path_tokens
+end
+
+---@param path string | string[]
+---@param keymap string
+---@return integer[]
+function M.keymap_location_in_path(path, keymap)
+  local path_tokens ---@type string[]
+  if type(path) == "table" then
+    path_tokens = path
+  else
+    path_tokens = vim.split(path, "/")
+  end
+  local path_token_offsets = {} ---@type table<integer, integer>
+  local prev_length = 0
+  for i, path_token in ipairs(path_tokens) do
+    path_token_offsets[i] = prev_length
+    -- NOTE: Highlights need byte offsets, not display width. Therefore, we calculate the
+    -- `significant_path_length` with `string.len`.
+    prev_length = string.len(path_token) + 1 -- +1 to account for dir separator.
+  end
+
+  local keymap_tokens = vim.split(keymap, "")
+
+  local path_indexes = {} ---@type integer[] 
+  for _, key in ipairs(keymap_tokens) do
+    local location_found = false
+    for i = #path_tokens, 1, -1 do
+      local path_token = path_tokens[i]
+      local offset = path_token_offsets[i]
+      local token_chars = vim.split(path_token, "")
+      for j, char in ipairs(token_chars) do
+        local path_index = offset + j
+        if key == char and not vim.tbl_contains(path_indexes, path_index) then
+          table.insert(path_indexes, 1, path_index)
+          location_found = true
+          break
+        end
+      end
+    end
+    if not location_found then
+      table.insert(path_indexes, 1, -1)
+    end
+  end
+  return path_indexes
+end
+
 return M

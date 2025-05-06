@@ -47,6 +47,8 @@
 
 ---@class hopper.ColorPalette
 ---@field secondary_text string
+---@field first_key string
+---@field second_key string
 
 local M = {}
 
@@ -60,6 +62,8 @@ local function try_load_kanagawa()
   ---@type hopper.ColorPalette
   return {
     secondary_text = kanagawa_colors.palette.fujiGray,
+    first_key = kanagawa_colors.palette.waveRed,
+    second_key = kanagawa_colors.palette.springBlue,
   }
 end
 
@@ -69,6 +73,8 @@ local function setup_higlights()
     return
   end
   vim.api.nvim_set_hl(0, "hopper.hl.SecondaryText", {fg = palette.secondary_text})
+  vim.api.nvim_set_hl(0, "hopper.hl.FirstKey", {fg = palette.first_key})
+  vim.api.nvim_set_hl(0, "hopper.hl.SecondKey", {fg = palette.second_key})
 end
 
 function M.setup()

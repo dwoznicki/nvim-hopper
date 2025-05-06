@@ -87,22 +87,6 @@ end
 
 function KeymapFloatingWindow:draw()
 
-  -- local lines = {} ---@type string[]
-  -- local hls = {} ---@type hopper.HighlightLocation[]
-  -- -- table.insert(lines, string.rep("─", self.win_width))
-  -- -- local message = "Enter a two character keymap."
-  -- -- table.insert(lines, message)
-  -- -- table.insert(hls, {name = "hopper.hl.SecondaryText", row = 1, col_start = 0, col_end = string.len(message)})
-  -- table.insert(lines, self.path)
-  -- table.insert(hls, {name = "hopper.hl.SecondaryText", row = 0, col_start = 0, col_end = string.len(self.path)})
-  -- vim.api.nvim_buf_clear_namespace(self.helper_buf, ns_id, 0, -1) -- clear highlights
-  -- vim.api.nvim_set_option_value("modifiable", true, {buf = self.helper_buf})
-  -- vim.api.nvim_buf_set_lines(self.helper_buf, 0, -1, false, lines)
-  -- vim.api.nvim_set_option_value("modifiable", false, {buf = self.helper_buf})
-  -- for _, hl in ipairs(hls) do
-  --   vim.api.nvim_buf_add_highlight(self.helper_buf, 0, hl.name, hl.row, hl.col_start, hl.col_end)
-  -- end
-
   vim.api.nvim_buf_clear_namespace(self.buf, ns_id, 0, -1) -- clear highlights
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
