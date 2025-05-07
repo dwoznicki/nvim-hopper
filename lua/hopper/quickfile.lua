@@ -231,54 +231,79 @@ end
 function M.truncate_path(path, available_width)
   local path_tokens = vim.split(path, "/")
   local truncated_path_tokens = {} ---@type string[]
+
+  local filename = table.remove(path_tokens) ---@type string
+  table.insert(truncated_path_tokens, filename)
+  if #path_tokens < 1 then
+    return truncated_path_tokens
+  end
+  local text_width = vim.fn.strdisplaywidth(filename) + 1
+  available_width = available_width - text_width
+  if available_width < 1 then
+    return truncated_path_tokens
+  end
+
+  local basedir = table.remove(path_tokens, 1) ---@type string
+  text_width = vim.fn.strdisplaywidth(basedir)
+  local next_available_width = available_width - text_width
+  if next_available_width < 1 then
+    basedir = "…"
+    text_width = vim.fn.strdisplaywidth(basedir)
+    next_available_width = available_width - text_width
+    if next_available_width < 1 then
+      return truncated_path_tokens
+    end
+  end
+  table.insert(truncated_path_tokens, 1, basedir)
+
   for i = #path_tokens, 1, -1 do
     local path_token = path_tokens[i]
-    local text_width = vim.fn.strdisplaywidth(path_token)
-    if i ~= 1 then
-      -- Account for dir separator.
-      text_width = text_width + 1
-    end
-    local next_available_width = available_width - text_width
+    text_width = vim.fn.strdisplaywidth(path_token) + 1 -- +1 to acocunt for leading dir separator.
+    next_available_width = available_width - text_width
     if next_available_width < 0 then
       path_token = "…"
       text_width = vim.fn.strdisplaywidth(path_token)
-      if i ~= 1 then
-        text_width = text_width + 1
-      end
       next_available_width = available_width - text_width
       if next_available_width < 0 then
         -- We've reached the hard limit on horizontal space. There's not even enough room for the
         -- ellipsis, so remove the previous path token to make room.
-        table.remove(truncated_path_tokens, i - 1)
+        truncated_path_tokens[i - 1] = path_token
         break
       end
-    end
-    if next_available_width < 0 then
+      table.insert(truncated_path_tokens, 2, path_token)
       break
     end
+    table.insert(truncated_path_tokens, 2, path_token)
     available_width = next_available_width
-    table.insert(truncated_path_tokens, 1, path_token)
   end
   return truncated_path_tokens
 end
 
+---@class hopper.KeymapLocationInPathOptions
+---@field missing_behavior "-1" | "end" | "nearby"
+
 ---@param path string | string[]
 ---@param keymap string
+---@param opts? hopper.KeymapLocationInPathOptions
 ---@return integer[]
-function M.keymap_location_in_path(path, keymap)
+function M.keymap_location_in_path(path, keymap, opts)
   local path_tokens ---@type string[]
   if type(path) == "table" then
     path_tokens = path
   else
     path_tokens = vim.split(path, "/")
   end
+
+  opts = opts or {}
+  local missing_behavior = opts.missing_behavior or "-1"
+
   local path_token_offsets = {} ---@type table<integer, integer>
-  local prev_length = 0
+  local last_index = 0
   for i, path_token in ipairs(path_tokens) do
-    path_token_offsets[i] = prev_length
+    path_token_offsets[i] = last_index
     -- NOTE: Highlights need byte offsets, not display width. Therefore, we calculate the
     -- `significant_path_length` with `string.len`.
-    prev_length = string.len(path_token) + 1 -- +1 to account for dir separator.
+    last_index = last_index + string.len(path_token) + 1 -- +1 to account for leading dir separator.
   end
 
   local keymap_tokens = vim.split(keymap, "")
@@ -293,14 +318,30 @@ function M.keymap_location_in_path(path, keymap)
       for j, char in ipairs(token_chars) do
         local path_index = offset + j
         if key == char and not vim.tbl_contains(path_indexes, path_index) then
-          table.insert(path_indexes, 1, path_index)
+          table.insert(path_indexes, path_index)
           location_found = true
           break
         end
       end
+      if location_found then
+        break
+      end
     end
     if not location_found then
-      table.insert(path_indexes, 1, -1)
+      local key_index ---@type integer
+      if missing_behavior == "end" then
+        key_index = last_index
+        last_index = last_index + 1
+      elseif missing_behavior == "nearby" then
+        if path_indexes[1] ~= nil then
+          key_index = path_indexes[1] + 1
+        else
+          key_index = last_index
+        end
+      else
+        key_index = -1
+      end
+      table.insert(path_indexes, key_index)
     end
   end
   return path_indexes
