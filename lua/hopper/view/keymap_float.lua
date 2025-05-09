@@ -1,4 +1,5 @@
 local utils = require("hopper.utils")
+local quickfile = require("hopper.quickfile")
 
 ---@alias hopper.HighlightLocation {name: string, row: integer, col_start: integer, col_end: integer}
 
@@ -39,13 +40,13 @@ end
 ---@param path string
 ---@param existing_keymap string | nil
 function KeymapFloatingWindow:open(project, path, existing_keymap)
-  self.project = project
-  self.path = path
-  self.keymap = existing_keymap or ""
-
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, _ = utils.get_win_dimensions()
   self.win_width = win_width
+
+  self.project = project
+  self.path = quickfile.truncate_path(path, win_width)
+  self.keymap = existing_keymap or ""
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "prompt", {buf = buf})
@@ -99,11 +100,16 @@ function KeymapFloatingWindow:draw()
     virt_text_pos = "right_align",
   })
 
+  local keymap_indexes = quickfile.keymap_location_in_path(self.path, self.keymap, {missing_behavior = "nearby"})
+  local virtual_text = quickfile.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
+  vim.print(virtual_text)
+
   vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
     virt_lines = {
-      {
-        {self.path, "hopper.hl.SecondaryText"},
-      },
+      virtual_text,
+      -- {
+      --   {self.path, "hopper.hl.SecondaryText"},
+      -- },
     },
     virt_lines_above = false,
     virt_lines_leftcol = false,
@@ -250,6 +256,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
         value = value:sub(1, 2)
         vim.api.nvim_buf_set_lines(buf, 0, 1, false, {value})
       end
+      self.keymap = value
       self:draw()
       -- vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
       -- vim.api.nvim_buf_add_highlight(bufnr, ns,

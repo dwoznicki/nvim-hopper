@@ -5,46 +5,31 @@ describe("quickfile utilities", function()
     it("should truncate path to available width (20 chars)", function()
       assert.equal(
         "this/…/Component.jsx",
-        table.concat(
-          quickfile.truncate_path("this/is/a/long/path/to/some/nested/Component.jsx", 20),
-          "/"
-        )
+        quickfile.truncate_path("this/is/a/long/path/to/some/nested/Component.jsx", 20)
       )
     end)
     it("should truncate path to available width (30 chars)", function()
       assert.equal(
         "this/…/to/some/nested/Component.jsx",
-        table.concat(
-          quickfile.truncate_path("this/is/a/long/path/to/some/nested/Component.jsx", 30),
-          "/"
-        )
+        quickfile.truncate_path("this/is/a/long/path/to/some/nested/Component.jsx", 30)
       )
     end)
     it("should truncate path to available width (40 chars)", function()
       assert.equal(
         "this/…/long/path/to/some/nested/Component.jsx",
-        table.concat(
-          quickfile.truncate_path("this/is/a/long/path/to/some/nested/Component.jsx", 40),
-          "/"
-        )
+        quickfile.truncate_path("this/is/a/long/path/to/some/nested/Component.jsx", 40)
       )
     end)
     it("should handle long file names", function()
       assert.equal(
         "ThisIsALongFileName.tsx",
-        table.concat(
-          quickfile.truncate_path("ThisIsALongFileName.tsx", 10),
-          "/"
-        )
+        quickfile.truncate_path("ThisIsALongFileName.tsx", 10)
       )
     end)
     it("should truncate base dir if too long", function()
       assert.equal(
         "…/SomeFileName.tsx",
-        table.concat(
-          quickfile.truncate_path("some-long-winded-dir-name/SomeFileName.tsx", 20),
-          "/"
-        )
+        quickfile.truncate_path("some-long-winded-dir-name/SomeFileName.tsx", 20)
       )
     end)
   end)

@@ -227,7 +227,7 @@ end
 
 ---@param path string
 ---@param available_width integer
----@return string[] truncated_path_tokens
+---@return string truncated_path_tokens
 function M.truncate_path(path, available_width)
   local path_tokens = vim.split(path, "/")
   local truncated_path_tokens = {} ---@type string[]
@@ -235,12 +235,12 @@ function M.truncate_path(path, available_width)
   local filename = table.remove(path_tokens) ---@type string
   table.insert(truncated_path_tokens, filename)
   if #path_tokens < 1 then
-    return truncated_path_tokens
+    return table.concat(truncated_path_tokens, "/")
   end
   local text_width = vim.fn.strdisplaywidth(filename) + 1
   available_width = available_width - text_width
   if available_width < 1 then
-    return truncated_path_tokens
+    return table.concat(truncated_path_tokens, "/")
   end
 
   local basedir = table.remove(path_tokens, 1) ---@type string
@@ -251,7 +251,7 @@ function M.truncate_path(path, available_width)
     text_width = vim.fn.strdisplaywidth(basedir)
     next_available_width = available_width - text_width
     if next_available_width < 1 then
-      return truncated_path_tokens
+      return table.concat(truncated_path_tokens, "/")
     end
   end
   table.insert(truncated_path_tokens, 1, basedir)
@@ -276,7 +276,7 @@ function M.truncate_path(path, available_width)
     table.insert(truncated_path_tokens, 2, path_token)
     available_width = next_available_width
   end
-  return truncated_path_tokens
+  return table.concat(truncated_path_tokens, "/")
 end
 
 ---@class hopper.KeymapLocationInPathOptions
@@ -297,6 +297,8 @@ function M.keymap_location_in_path(path, keymap, opts)
   opts = opts or {}
   local missing_behavior = opts.missing_behavior or "-1"
 
+  -- Returned indexes are relative to the full path string, not individual path tokens. This mapping
+  -- allows us to determine full path index while checking each path token one by one.
   local path_token_offsets = {} ---@type table<integer, integer>
   local last_index = 0
   for i, path_token in ipairs(path_tokens) do
@@ -306,14 +308,16 @@ function M.keymap_location_in_path(path, keymap, opts)
     last_index = last_index + string.len(path_token) + 1 -- +1 to account for leading dir separator.
   end
 
-  local keymap_tokens = vim.split(keymap, "")
-
   local path_indexes = {} ---@type integer[] 
+  local keymap_tokens = vim.split(keymap, "")
+  -- Iterate through keys in the given keymap, trying to find an index in the path that matches the
+  -- given key. We'll draw a visual indicator at this index.
   for _, key in ipairs(keymap_tokens) do
     local location_found = false
     for i = #path_tokens, 1, -1 do
       local path_token = path_tokens[i]
       local offset = path_token_offsets[i]
+      -- Iterate path token characters, checking for a match with the current key.
       local token_chars = vim.split(path_token, "")
       for j, char in ipairs(token_chars) do
         local path_index = offset + j
@@ -330,15 +334,21 @@ function M.keymap_location_in_path(path, keymap, opts)
     if not location_found then
       local key_index ---@type integer
       if missing_behavior == "end" then
+        -- First blank index after file path. Increment last index so that next missing location
+        -- is after this one.
         key_index = last_index
         last_index = last_index + 1
       elseif missing_behavior == "nearby" then
+        -- Next index after previous found key index. If there is no previous key index, slap key at
+        -- the end of the path, just like "end" behavior.
         if path_indexes[1] ~= nil then
           key_index = path_indexes[1] + 1
         else
           key_index = last_index
         end
       else
+        -- Dummy index. This cannot be used, meaning it's up to the caller to determine what to do
+        -- in this case.
         key_index = -1
       end
       table.insert(path_indexes, key_index)
@@ -346,5 +356,37 @@ function M.keymap_location_in_path(path, keymap, opts)
   end
   return path_indexes
 end
+
+---@param path string
+---@param keymap string
+---@param keymap_indexes integer[]
+---@return string[][]
+function M.highlight_path_virtual_text(path, keymap, keymap_indexes)
+  vim.print("path", path)
+  vim.print("keymap", keymap)
+  vim.print("keymap_indexes", keymap_indexes)
+  local highlighted_parts = {} ---@type string[][]
+  local start_idx = 1
+  local sorted_indexes = require("hopper.utils").sorted(keymap_indexes)
+  for _, idx in ipairs(sorted_indexes) do
+    local part = string.sub(path, start_idx, idx - 1)
+    local key ---@type string
+    local hl_name ---@type string
+    if idx == keymap_indexes[1] then
+      key = string.sub(keymap, 1, 1)
+      hl_name = "hopper.hl.FirstKey"
+    else
+      key = string.sub(keymap, 2, 2)
+      hl_name = "hopper.hl.SecondKey"
+    end
+    table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})
+    table.insert(highlighted_parts, {key, hl_name})
+    start_idx = idx + 1
+  end
+  local part = string.sub(path, start_idx)
+  table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})
+  return highlighted_parts
+end
+
 
 return M

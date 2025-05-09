@@ -48,4 +48,17 @@ function M.readonly(tbl)
   return proxy
 end
 
+---@generic T
+---@param tbl T[]
+---@return T[]
+function M.sorted(tbl)
+  ---@generic T
+  local tbl_copy = {} ---@type T[]
+  for i, item in ipairs(tbl) do
+    tbl_copy[i] = item
+  end
+  table.sort(tbl_copy)
+  return tbl_copy
+end
+
 return M
