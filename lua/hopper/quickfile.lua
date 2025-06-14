@@ -362,9 +362,6 @@ end
 ---@param keymap_indexes integer[]
 ---@return string[][]
 function M.highlight_path_virtual_text(path, keymap, keymap_indexes)
-  vim.print("path", path)
-  vim.print("keymap", keymap)
-  vim.print("keymap_indexes", keymap_indexes)
   local highlighted_parts = {} ---@type string[][]
   local start_idx = 1
   local sorted_indexes = require("hopper.utils").sorted(keymap_indexes)

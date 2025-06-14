@@ -87,29 +87,24 @@ function KeymapFloatingWindow:open(project, path, existing_keymap)
 end
 
 function KeymapFloatingWindow:draw()
-
   vim.api.nvim_buf_clear_namespace(self.buf, ns_id, 0, -1) -- clear highlights
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
   local used = string.len(value)
-  local max_chars = 2
+  local num_chars = 2
   vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
     virt_text = {
-      {string.format("%d/%d", used, max_chars), "Comment"}
+      {string.format("%d/%d", used, num_chars), "Comment"}
     },
     virt_text_pos = "right_align",
   })
 
   local keymap_indexes = quickfile.keymap_location_in_path(self.path, self.keymap, {missing_behavior = "nearby"})
   local virtual_text = quickfile.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
-  vim.print(virtual_text)
 
   vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
     virt_lines = {
       virtual_text,
-      -- {
-      --   {self.path, "hopper.hl.SecondaryText"},
-      -- },
     },
     virt_lines_above = false,
     virt_lines_leftcol = false,
@@ -117,8 +112,12 @@ function KeymapFloatingWindow:draw()
 end
 
 function KeymapFloatingWindow:confirm()
+  local num_chars = 2
+  if string.len(self.keymap) ~= num_chars then
+    error("Keymap must be exactly " .. num_chars .. " characters in length.")
+  end
   local datastore = require("hopper.db").datastore()
-  datastore:set_quick_file(self.project, self.path, self.keymap)
+  datastore:set_mapping(self.project, self.path, self.keymap)
 end
 
 function KeymapFloatingWindow:close()
@@ -220,10 +219,15 @@ end
 
 function KeymapFloatingWindow:_attach_event_handlers()
   local buf = self.buf
+  local num_chars = 2
   vim.keymap.set(
     {"i", "n"},
     "<cr>",
     function()
+      if string.len(self.keymap) < num_chars then
+        -- Ignore confirmation attempts until user has typed enough characters.
+        return
+      end
       self:confirm()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}

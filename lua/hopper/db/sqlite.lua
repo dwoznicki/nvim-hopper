@@ -216,11 +216,11 @@ end
 ---@class hopper.SqlDatastore
 ---@field conn hopper.Connection
 ---@field create_tables_stmt hopper.PreparedStatement | nil
----@field select_qfiles_stmt hopper.PreparedStatement | nil
----@field select_qfile_id_by_path_stmt hopper.PreparedStatement | nil
----@field insert_qfile_stmt hopper.PreparedStatement | nil
----@field update_qfile_stmt hopper.PreparedStatement | nil
----@field delete_qfile_stmt hopper.PreparedStatement | nil
+---@field select_mappings_stmt hopper.PreparedStatement | nil
+---@field select_mapping_id_by_path_stmt hopper.PreparedStatement | nil
+---@field insert_mapping_stmt hopper.PreparedStatement | nil
+---@field update_mapping_stmt hopper.PreparedStatement | nil
+---@field delete_mapping_stmt hopper.PreparedStatement | nil
 ---@field update_usage_stmt hopper.PreparedStatement | nil
 local SqlDatastore = {}
 SqlDatastore.__index = SqlDatastore
@@ -237,17 +237,16 @@ end
 function SqlDatastore:init()
   if self.create_tables_stmt == nil then
     self.create_tables_stmt = PreparedStatement.new([[
-      CREATE TABLE IF NOT EXISTS quick_files (
+      CREATE TABLE IF NOT EXISTS mappings (
         id INTEGER PRIMARY KEY,
         project TEXT NOT NULL,
         path TEXT NOT NULL,
         keymap TEXT NOT NULL,
-        key_indexes_json TEXT NOT NULL CHECK (json_validate(key_indexes_json)),
         created INTEGER NOT NULL,
         UNIQUE (project, path),
         UNIQUE (project, keymap)
       );
-      CREATE INDEX quick_files_project_idx ON quick_files (project);
+      CREATE INDEX mappings_project_idx ON mappings (project);
     ]], self.conn)
   end
   self.create_tables_stmt:exec_update()
@@ -255,65 +254,53 @@ end
 
 ---@param project string
 ---@return string[][]
-function SqlDatastore:get_quick_files(project)
-  if self.select_qfiles_stmt == nil then
-    self.select_qfiles_stmt = PreparedStatement.new([[
-      SELECT path, keymap, key_indexes_json FROM quick_files WHERE project = ? ORDER BY last_used DESC
+function SqlDatastore:list_mappings(project)
+  if self.select_mappings_stmt == nil then
+    self.select_mappings_stmt = PreparedStatement.new([[
+      SELECT path, keymap, key_indexes_json FROM mappings WHERE project = ? ORDER BY last_used DESC
     ]], self.conn)
   end
-  local results = self.select_qfiles_stmt:exec_query({project})
+  local results = self.select_mappings_stmt:exec_query({project})
   return results
 end
 
 ---@param project string
 ---@param path string
 ---@param keymap string
----@param key_indexes_json string
-function SqlDatastore:set_quick_file(project, path, keymap, key_indexes_json)
-  if self.select_qfile_id_by_path_stmt == nil then
-    self.select_qfile_id_by_path_stmt = PreparedStatement.new([[
-      SELECT id FROM quick_files WHERE project = ? AND path = ?
+function SqlDatastore:set_mapping(project, path, keymap)
+  if self.select_mapping_id_by_path_stmt == nil then
+    self.select_mapping_id_by_path_stmt = PreparedStatement.new([[
+      SELECT id FROM mappings WHERE project = ? AND path = ?
     ]], self.conn)
   end
-  local results = self.select_qfile_id_by_path_stmt:exec_query({project, path})
-  if #results > 0 then
-    if self.insert_qfile_stmt == nil then
-      self.insert_qfile_stmt = PreparedStatement.new([[
-        INSERT INTO quick_files (project, path, keymap, key_indexes_json, created)
-        VALUES (?, ?, ?, ?, unixepoch())
+  local results = self.select_mapping_id_by_path_stmt:exec_query({project, path})
+  if #results < 1 then
+    if self.insert_mapping_stmt == nil then
+      self.insert_mapping_stmt = PreparedStatement.new([[
+        INSERT INTO mappings (project, path, keymap, created)
+        VALUES (?, ?, ?, unixepoch())
       ]], self.conn)
     end
-    self.insert_qfile_stmt:exec_update({project, path, keymap, key_indexes_json})
+    self.insert_mapping_stmt:exec_update({project, path, keymap})
   else
-    if self.update_qfile_stmt == nil then
-      self.update_qfile_stmt = PreparedStatement.new([[
-        UPDATE quick_files SET keymap = ?, key_indexes_json = ? WHERE id = ?
+    if self.update_mapping_stmt == nil then
+      self.update_mapping_stmt = PreparedStatement.new([[
+        UPDATE mappings SET keymap = ? WHERE id = ?
       ]], self.conn)
     end
-    self.update_qfile_stmt:exec_update({keymap, key_indexes_json, results[0][0]})
+    self.update_mapping_stmt:exec_update({keymap, results[1][1]})
   end
 end
 
 ---@param project string
 ---@param path string
-function SqlDatastore:remove_quick_file(project, path)
-  if self.delete_qfile_stmt == nil then
-    self.delete_qfile_stmt = PreparedStatement.new([[
-      DELETE FROM quick_files WHERE project = ? AND path = ?
+function SqlDatastore:remove_mapping(project, path)
+  if self.delete_mapping_stmt == nil then
+    self.delete_mapping_stmt = PreparedStatement.new([[
+      DELETE FROM mappings WHERE project = ? AND path = ?
     ]], self.conn)
   end
-  self.delete_qfile_stmt:exec_update({project, path})
+  self.delete_mapping_stmt:exec_update({project, path})
 end
-
--- ---@param project string
--- ---@param keymap string
--- function SqlDatastore:track_quick_file_usage(project, keymap)
---   if self.update_usage_stmt == nil then
---     self.update_usage_stmt = PreparedStatement.new([[
---       UPDATE quick_files SET last_used = unixepoch() WHERE project = ? AND keymap = ?
---     ]], self.conn)
---   end
---   self.update_usage_stmt:exec_update({project, keymap})
--- end
 
 return M
