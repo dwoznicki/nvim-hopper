@@ -4,6 +4,9 @@ local quickfile = require("hopper.quickfile")
 ---@alias hopper.HighlightLocation {name: string, row: integer, col_start: integer, col_end: integer}
 
 local ns_id = vim.api.nvim_create_namespace("hopper.KeymapFloatingWindow")
+--TODO: Make this configurable.
+local num_chars = 2
+local loop = vim.uv or vim.loop
 
 local M = {}
 
@@ -14,6 +17,7 @@ local M = {}
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer
+---@field conflicting_mapping hopper.Mapping | nil
 local KeymapFloatingWindow = {}
 KeymapFloatingWindow.__index = KeymapFloatingWindow
 M.KeymapFloatingWindow = KeymapFloatingWindow
@@ -34,6 +38,7 @@ function KeymapFloatingWindow._reset(float)
   float.buf = -1
   float.win = -1
   float.win_width = -1
+  float.conflicting_mapping = nil
 end
 
 ---@param project string
@@ -59,7 +64,7 @@ function KeymapFloatingWindow:open(project, path, existing_keymap)
     style = "minimal",
     relative = "editor",
     width = win_width,
-    height = 2,
+    height = 3,
     row = 3,
     col = math.floor((ui.width - win_width) * 0.5),
     -- border = "none",
@@ -91,7 +96,6 @@ function KeymapFloatingWindow:draw()
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
   local used = string.len(value)
-  local num_chars = 2
   vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
     virt_text = {
       {string.format("%d/%d", used, num_chars), "Comment"}
@@ -100,24 +104,46 @@ function KeymapFloatingWindow:draw()
   })
 
   local keymap_indexes = quickfile.keymap_location_in_path(self.path, self.keymap, {missing_behavior = "nearby"})
-  local virtual_text = quickfile.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
+  local path_line = quickfile.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
+  local help_line = {
+    {"? Help", ""}, {"  ", ""}, {"󰌑  Confirm", "Function"},
+  }
+
+  local error_line = nil ---@type string[][]
+  local next_win_height ---@type integer
+  if self.conflicting_mapping ~= nil then
+    next_win_height = 4
+    error_line = {
+      {"Conflicting mapping found for file: " .. self.conflicting_mapping.path, "Error"},
+    }
+  else
+    next_win_height = 3
+  end
+  if vim.api.nvim_win_get_height(self.win) ~= next_win_height then
+    vim.api.nvim_win_set_height(self.win, next_win_height)
+  end
+
+  local virtual_lines = {} ---@type string[][][]
+  table.insert(virtual_lines, path_line)
+  if error_line ~= nil then
+    table.insert(virtual_lines, error_line)
+  end
+  table.insert(virtual_lines, help_line)
 
   vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
-    virt_lines = {
-      virtual_text,
-    },
+    virt_lines = virtual_lines,
     virt_lines_above = false,
     virt_lines_leftcol = false,
   })
 end
 
 function KeymapFloatingWindow:confirm()
-  local num_chars = 2
   if string.len(self.keymap) ~= num_chars then
     error("Keymap must be exactly " .. num_chars .. " characters in length.")
   end
   local datastore = require("hopper.db").datastore()
   datastore:set_mapping(self.project, self.path, self.keymap)
+  self:close()
 end
 
 function KeymapFloatingWindow:close()
@@ -133,99 +159,18 @@ function KeymapFloatingWindow:close()
   KeymapFloatingWindow._reset(self)
 end
 
--- ---@param ui any
--- ---@param win_width integer
--- ---@return integer buf, integer win
--- function KeymapFloatingWindow._open_container(ui, win_width)
---   local buf = vim.api.nvim_create_buf(false, true)
---   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
---   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
---   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
---   ---@type vim.api.keyset.win_config
---   local win_config = {
---     style = "minimal",
---     relative = "editor",
---     width = win_width,
---     height = 2,
---     row = 3,
---     col = math.floor((ui.width - win_width) * 0.5),
---     -- border = "none",
---     focusable = false,
---     title = " Enter a keymap ",
---     title_pos = "center",
---     border = "rounded",
---   }
---   local win = vim.api.nvim_open_win(buf, false, win_config)
---   return buf, win
--- end
-
--- ---@param container_win integer
--- ---@param win_width integer
--- ---@return integer buf, integer win
--- function KeymapFloatingWindow._open_input(container_win, win_width)
---   local buf = vim.api.nvim_create_buf(false, true)
---   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
---   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
---   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
---   vim.api.nvim_set_option_value("filetype", "HopperKeymapFloat", {buf = buf})
---   ---@type vim.api.keyset.win_config
---   local win_config = {
---     style = "minimal",
---     relative = "win",
---     win = container_win,
---     width = win_width,
---     -- height = win_height - 1, -- space for status line
---     height = 2,
---     row = 0,
---     col = 0,
---     border = "none",
---     focusable = true,
---   }
---   -- Start in insert mode.
---   vim.api.nvim_create_autocmd("BufEnter", {
---     buffer = buf,
---     callback = function()
---       vim.cmd("startinsert")
---     end,
---   })
---   local win = vim.api.nvim_open_win(buf, true, win_config)
---   return buf, win
--- end
-
--- ---@param container_win integer
--- ---@param win_width integer
--- ---@return integer buf, integer win
--- function KeymapFloatingWindow._open_helper(container_win, win_width)
---   local buf = vim.api.nvim_create_buf(false, true)
---   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
---   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
---   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
---   vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
---   ---@type vim.api.keyset.win_config
---   local win_config = {
---     style = "minimal",
---     relative = "win",
---     win = container_win,
---     width = win_width,
---     height = 1,
---     row = 1,
---     col = 0,
---     border = "none",
---     focusable = false,
---   }
---   local win = vim.api.nvim_open_win(buf, false, win_config)
---   return buf, win
--- end
-
 function KeymapFloatingWindow:_attach_event_handlers()
   local buf = self.buf
-  local num_chars = 2
   vim.keymap.set(
     {"i", "n"},
     "<cr>",
     function()
       if string.len(self.keymap) < num_chars then
         -- Ignore confirmation attempts until user has typed enough characters.
+        return
+      end
+      if self.conflicting_mapping ~= nil then
+        -- Ignore confirmation if there is a conflicting mapping.
         return
       end
       self:confirm()
@@ -255,16 +200,27 @@ function KeymapFloatingWindow:_attach_event_handlers()
     buffer = buf,
     callback = function()
       local value = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
-      -- local value = vim.fn.prompt_getprompt(buf)
-      if string.len(value) > 2 then
-        value = value:sub(1, 2)
+      if string.len(value) > num_chars then
+        value = value:sub(1, num_chars)
         vim.api.nvim_buf_set_lines(buf, 0, 1, false, {value})
       end
       self.keymap = value
       self:draw()
-      -- vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
-      -- vim.api.nvim_buf_add_highlight(bufnr, ns,
-      --   'PmenuSel', 0, #line, -1)
+      local float = self
+      loop.new_timer():start(0, 0, function()
+        local datastore = require("hopper.db").datastore()
+        local mapping = datastore:get_mapping_by_keymap(float.project, float.keymap)
+        vim.schedule(function()
+          if mapping ~= nil and mapping.path == float.path then
+            mapping = nil
+          end
+          local prev_mapping = float.conflicting_mapping
+          float.conflicting_mapping = mapping
+          if (prev_mapping == nil and mapping ~= nil) or (prev_mapping ~= nil and mapping == nil) then
+            float:draw()
+          end
+        end)
+      end)
     end,
   })
 

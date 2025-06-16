@@ -3,21 +3,28 @@ local ffi = require("ffi")
 ffi.cdef([[
   typedef struct sqlite3 sqlite3;
   typedef struct sqlite3_stmt sqlite3_stmt;
+  typedef void (*sqlite3_destructor_type)(void*);
 
   int sqlite3_open(const char *filename, sqlite3 **ppDb);
   int sqlite3_close(sqlite3*);
   int sqlite3_exec(sqlite3*, const char *sql, int (*callback)(void*, int, char**, char**), void*, char **errmsg);
   int sqlite3_prepare_v2(sqlite3*, const char *zSql, int nByte, sqlite3_stmt **ppStmt, const char **pzTail);
   int sqlite3_reset(sqlite3_stmt*);
+  int sqlite3_clear_bindings(sqlite3_stmt*);
   int sqlite3_step(sqlite3_stmt*);
   int sqlite3_finalize(sqlite3_stmt*);
+  int sqlite3_bind_parameter_count(sqlite3_stmt*);
   int sqlite3_bind_text(sqlite3_stmt*, int, const char*, int n, void(*)(void*));
   int sqlite3_bind_int64(sqlite3_stmt*, int, long long);
   const unsigned char *sqlite3_column_text(sqlite3_stmt*, int);
   long long sqlite3_column_int64(sqlite3_stmt*, int);
   int sqlite3_column_count(sqlite3_stmt*);
   int sqlite3_changes(sqlite3*);
+  const char* sqlite3_errmsg(sqlite3*);
 ]])
+
+local SQLITE_STATIC = ffi.cast("sqlite3_destructor_type", 0)
+local SQLITE_TRANSIENT = ffi.cast("sqlite3_destructor_type", -1)
 
 local function sqlite3_lib()
   -- local opts = Snacks.picker.config.get()
@@ -71,13 +78,17 @@ local sqlite = ffi.load(sqlite3_lib())
 local function bind(stmt, idx, value, value_type)
   value_type = value_type or type(value)
   if value_type == "string" then
-    return sqlite.sqlite3_bind_text(stmt, idx, value, #value, nil)
+    return sqlite.sqlite3_bind_text(stmt, idx, value, #value, SQLITE_STATIC)
   elseif value_type == "number" then
     return sqlite.sqlite3_bind_int64(stmt, idx, value)
   elseif value_type == "boolean" then
     return sqlite.sqlite3_bind_int64(stmt, idx, value and 1 or 0)
   else
-    error("Unsupported value type: " .. type(value) .. " (" .. tostring(value) .. ")")
+    error(string.format(
+      "Unsupported value type: %s, \"%s\"",
+      type(value),
+      tostring(value)
+    ))
   end
 end
 
@@ -132,7 +143,12 @@ function PreparedStatement.new(sql, conn)
   pstmt.sqlite_stmt = sqlite_stmt
   local code = sqlite.sqlite3_prepare_v2(conn_ptr, sql, #sql, sqlite_stmt, nil)
   if code ~= 0 then
-    error("Failed to prepare statement: " .. code)
+    local err = pstmt:_last_sqlite_error()
+    error(string.format(
+      "Failed to prepare statement. sqlite#%d: %s",
+      code,
+      err
+    ))
   end
   ffi.gc(sqlite_stmt, function()
     pstmt:close()
@@ -144,12 +160,28 @@ end
 ---@return string[][]
 function PreparedStatement:exec_query(binds)
   local stmt_ptr = self.sqlite_stmt[0]
+  sqlite.sqlite3_reset(stmt_ptr)
+  sqlite.sqlite3_clear_bindings(stmt_ptr)
   if binds then
+    local param_count = sqlite.sqlite3_bind_parameter_count(stmt_ptr)
+    if param_count ~= #binds then
+      error(string.format(
+        "Wrong number of parameters to bind. Exepected %d, but found %d.",
+        param_count,
+        #binds
+      ))
+    end
     for i, value in ipairs(binds) do
       local code = bind(stmt_ptr, i, value)
       if code ~= 0 then
-        sqlite.sqlite3_finalize(stmt_ptr)
-        error("Failed to bind parameter " .. i .. ": " .. tostring(value))
+        local err = self:_last_sqlite_error()
+        error(string.format(
+          "Failed to find parameter %d with value \"%s\". sqlite#%d: %s",
+          i,
+          tostring(value),
+          code,
+          err
+        ))
       end
     end
   end
@@ -170,12 +202,17 @@ function PreparedStatement:exec_query(binds)
     elseif code == 101 then  -- SQLITE_DONE
       break
     else
-      sqlite.sqlite3_finalize(stmt_ptr)
-      error("Error during sqlite3_step: " .. code)
+      local err = self:_last_sqlite_error()
+      -- sqlite.sqlite3_finalize(stmt_ptr)
+      error(string.format(
+        "Error iterating database rows. sqlite#%d: %s",
+        code,
+        err
+      ))
     end
   end
 
-  sqlite.sqlite3_finalize(stmt_ptr)
+  -- sqlite.sqlite3_finalize(stmt_ptr)
   return results
 end
 
@@ -183,23 +220,41 @@ end
 ---@return integer
 function PreparedStatement:exec_update(binds)
   local stmt_ptr = self.sqlite_stmt[0]
+  sqlite.sqlite3_reset(stmt_ptr)
+  sqlite.sqlite3_clear_bindings(stmt_ptr)
   if binds then
+    local param_count = sqlite.sqlite3_bind_parameter_count(stmt_ptr)
+    if param_count ~= #binds then
+      error(string.format(
+        "Wrong number of parameters to bind. Exepected %d, but found %d.",
+        param_count,
+        #binds
+      ))
+    end
     for i, value in ipairs(binds) do
-      local ret = bind(stmt_ptr, i, value)
-      if ret ~= 0 then
-        sqlite.sqlite3_finalize(stmt_ptr)
-        error("Failed to bind parameter " .. i .. ": " .. tostring(value))
+      local code = bind(stmt_ptr, i, value)
+      if code ~= 0 then
+        local err = self:_last_sqlite_error()
+        error(string.format(
+          "Failed to find parameter %d with value \"%s\". sqlite#%d: %s",
+          i,
+          tostring(value),
+          code,
+          err
+        ))
       end
     end
   end
 
   local code = sqlite.sqlite3_step(stmt_ptr)
   if code ~= 101 then  -- SQLITE_DONE
-    sqlite.sqlite3_finalize(stmt_ptr)
-    error("Error executing statement: " .. code)
+    local err = self:_last_sqlite_error()
+    error(string.format(
+      "Failed to execute statement. sqlite#%d: %s",
+      code,
+      err
+    ))
   end
-
-  sqlite.sqlite3_finalize(stmt_ptr)
 
   -- sqlite3_changes returns the number of rows affected by the last operation.
   return sqlite.sqlite3_changes(self.conn.sqlite_conn[0])
@@ -208,9 +263,17 @@ end
 function PreparedStatement:close()
   local stmt_ptr = self.sqlite_stmt[0]
   if stmt_ptr then
+    sqlite.sqlite3_finalize(stmt_ptr)
     sqlite.sqlite3_close(stmt_ptr)
     self.sqlite_stmt = nil
   end
+end
+
+---@return string
+function PreparedStatement:_last_sqlite_error()
+  local conn_ptr = self.conn.sqlite_conn[0]
+  local raw_err = sqlite.sqlite3_errmsg(conn_ptr)
+  return ffi.string(raw_err)
 end
 
 ---@class hopper.SqlDatastore
@@ -218,6 +281,7 @@ end
 ---@field create_tables_stmt hopper.PreparedStatement | nil
 ---@field select_mappings_stmt hopper.PreparedStatement | nil
 ---@field select_mapping_id_by_path_stmt hopper.PreparedStatement | nil
+---@field select_mapping_by_keymap_stmt hopper.PreparedStatement | nil
 ---@field insert_mapping_stmt hopper.PreparedStatement | nil
 ---@field update_mapping_stmt hopper.PreparedStatement | nil
 ---@field delete_mapping_stmt hopper.PreparedStatement | nil
@@ -252,16 +316,49 @@ function SqlDatastore:init()
   self.create_tables_stmt:exec_update()
 end
 
+---@alias hopper.Mapping {id: integer, project: string, path: string, keymap: string}
+
 ---@param project string
----@return string[][]
+---@return hopper.Mapping[]
 function SqlDatastore:list_mappings(project)
   if self.select_mappings_stmt == nil then
     self.select_mappings_stmt = PreparedStatement.new([[
-      SELECT path, keymap, key_indexes_json FROM mappings WHERE project = ? ORDER BY last_used DESC
+      SELECT id, project, path, keymap FROM mappings WHERE project = ? ORDER BY created
     ]], self.conn)
   end
   local results = self.select_mappings_stmt:exec_query({project})
-  return results
+  local mappings = {} ---@type hopper.Mapping[]
+  for _, result in ipairs(results) do
+    table.insert(mappings, {
+      id = result[1],
+      project = result[2],
+      path = result[3],
+      keymap = result[4],
+    })
+  end
+  return mappings
+end
+
+
+---@param project string
+---@param keymap string
+---@return hopper.Mapping | nil
+function SqlDatastore:get_mapping_by_keymap(project, keymap)
+  if self.select_mapping_by_keymap_stmt == nil then
+    self.select_mapping_by_keymap_stmt = PreparedStatement.new([[
+      SELECT id, project, path, keymap FROM mappings WHERE project = ? AND keymap = ?
+    ]], self.conn)
+  end
+  local results = self.select_mapping_by_keymap_stmt:exec_query({project, keymap})
+  if #results < 1 then
+    return nil
+  end
+  return {
+    id = results[1][1],
+    project = results[1][2],
+    path = results[1][3],
+    keymap = results[1][4],
+  }
 end
 
 ---@param project string
