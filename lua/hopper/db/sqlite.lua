@@ -282,6 +282,7 @@ end
 ---@field select_mappings_stmt hopper.PreparedStatement | nil
 ---@field select_mapping_id_by_path_stmt hopper.PreparedStatement | nil
 ---@field select_mapping_by_keymap_stmt hopper.PreparedStatement | nil
+---@field select_mapping_by_path_stmt hopper.PreparedStatement | nil
 ---@field insert_mapping_stmt hopper.PreparedStatement | nil
 ---@field update_mapping_stmt hopper.PreparedStatement | nil
 ---@field delete_mapping_stmt hopper.PreparedStatement | nil
@@ -350,6 +351,27 @@ function SqlDatastore:get_mapping_by_keymap(project, keymap)
     ]], self.conn)
   end
   local results = self.select_mapping_by_keymap_stmt:exec_query({project, keymap})
+  if #results < 1 then
+    return nil
+  end
+  return {
+    id = results[1][1],
+    project = results[1][2],
+    path = results[1][3],
+    keymap = results[1][4],
+  }
+end
+
+---@param project string
+---@param path string
+---@return hopper.Mapping | nil
+function SqlDatastore:get_mapping_by_path(project, path)
+  if self.select_mapping_by_path_stmt == nil then
+    self.select_mapping_by_path_stmt = PreparedStatement.new([[
+      SELECT id, project, path, keymap FROM mappings WHERE project = ? AND path = ?
+    ]], self.conn)
+  end
+  local results = self.select_mapping_by_path_stmt:exec_query({project, path})
   if #results < 1 then
     return nil
   end

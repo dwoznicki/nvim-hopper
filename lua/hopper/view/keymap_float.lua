@@ -67,7 +67,6 @@ function KeymapFloatingWindow:open(project, path, existing_keymap)
     height = 3,
     row = 3,
     col = math.floor((ui.width - win_width) * 0.5),
-    -- border = "none",
     focusable = true,
     title = " Enter a keymap ",
     title_pos = "center",
@@ -75,13 +74,18 @@ function KeymapFloatingWindow:open(project, path, existing_keymap)
   }
   -- Don't show the prompt text.
   vim.fn.prompt_setprompt(buf, "")
-  -- Start in insert mode.
-  vim.api.nvim_create_autocmd("BufEnter", {
-    buffer = buf,
-    callback = function()
-      vim.cmd("startinsert")
-    end,
-  })
+  -- If there is an existing mapping, pre-populate it.
+  -- Otherwise, start in insert mode so user can immediately start typing.
+  if existing_keymap then
+    vim.api.nvim_buf_set_lines(buf, 0, 1, false, {existing_keymap})
+  else
+    vim.api.nvim_create_autocmd("BufEnter", {
+      buffer = buf,
+      callback = function()
+        vim.cmd("startinsert")
+      end,
+    })
+  end
   local win = vim.api.nvim_open_win(buf, true, win_config)
   self.buf = buf
   self.win = win
@@ -105,9 +109,13 @@ function KeymapFloatingWindow:draw()
 
   local keymap_indexes = quickfile.keymap_location_in_path(self.path, self.keymap, {missing_behavior = "nearby"})
   local path_line = quickfile.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
-  local help_line = {
-    {"? Help", ""}, {"  ", ""}, {"󰌑  Confirm", "Function"},
-  }
+  local help_line = {{"  "}} ---@type string[][]
+  if self:_keymap_ok() then
+    table.insert(help_line, {"󰌑 ", "Function"})
+    table.insert(help_line, {" Confirm"})
+  else
+    table.insert(help_line, {"󰌑  Confirm", "Comment"})
+  end
 
   local error_line = nil ---@type string[][]
   local next_win_height ---@type integer
@@ -138,8 +146,8 @@ function KeymapFloatingWindow:draw()
 end
 
 function KeymapFloatingWindow:confirm()
-  if string.len(self.keymap) ~= num_chars then
-    error("Keymap must be exactly " .. num_chars .. " characters in length.")
+  if not self:_keymap_ok() then
+    return
   end
   local datastore = require("hopper.db").datastore()
   datastore:set_mapping(self.project, self.path, self.keymap)
@@ -165,14 +173,6 @@ function KeymapFloatingWindow:_attach_event_handlers()
     {"i", "n"},
     "<cr>",
     function()
-      if string.len(self.keymap) < num_chars then
-        -- Ignore confirmation attempts until user has typed enough characters.
-        return
-      end
-      if self.conflicting_mapping ~= nil then
-        -- Ignore confirmation if there is a conflicting mapping.
-        return
-      end
       self:confirm()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
@@ -259,13 +259,27 @@ function KeymapFloatingWindow:_attach_event_handlers()
   -- })
 end
 
-local instance = nil ---@type hopper.KeymapFloatingWindow | nil
----@return hopper.KeymapFloatingWindow
-function M.instance()
-  if instance == nil then
-    instance = KeymapFloatingWindow._new()
+---@return boolean
+function KeymapFloatingWindow:_keymap_ok()
+  if string.len(self.keymap) < num_chars then
+    -- Keymap must have exactly specified number of characters.
+    return false
   end
-  return instance
+  if self.conflicting_mapping ~= nil then
+    -- Keymaap cannot have a known conflict.
+    return false
+  end
+  return true
+end
+
+local float = nil ---@type hopper.KeymapFloatingWindow | nil
+
+---@return hopper.KeymapFloatingWindow
+function M.float()
+  if float == nil then
+    float = KeymapFloatingWindow._new()
+  end
+  return float
 end
 
 return M

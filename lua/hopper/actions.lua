@@ -1,9 +1,16 @@
 local M = {}
 
 function M.choose_keymap()
+  local project = "x"
   local path = require("hopper.filepath").get_path_from_project_root(vim.api.nvim_buf_get_name(0))
-  local keymap_float = require("hopper.view.keymap_float").instance()
-  keymap_float:open("x", path)
+  local datastore = require("hopper.db").datastore()
+  local existing_mapping = datastore:get_mapping_by_path(project, path)
+  local existing_keymap = nil ---@type string | nil
+  if existing_mapping ~= nil then
+    existing_keymap = existing_mapping.keymap
+  end
+  local keymap_float = require("hopper.view.keymap_float").float()
+  keymap_float:open("x", path, existing_keymap)
 end
 
 return M
