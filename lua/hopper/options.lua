@@ -29,8 +29,7 @@ local M = {}
 ---@class hopper.FileOptionsFull
 ---@field keyset string[]
 
----@type hopper.OptionsFull
-M.default_options = {
+local _default_options = { ---@type hopper.OptionsFull
   default_mode = "jump",
   buffers = {
     show_unloaded = true,
@@ -43,23 +42,26 @@ M.default_options = {
     },
   },
 }
-M.default_options = readonly(M.default_options)
 
----@type hopper.OptionsFull | nil
-M._options = nil
+local _options = nil ---@type hopper.OptionsFull | nil
+
+---@return hopper.OptionsFull
+function M.default_options()
+  return readonly(_default_options)
+end
 
 ---@param opts hopper.Options | nil
 function M.set_options(opts)
   opts = opts or {}
-  M._options = vim.tbl_deep_extend("force", {}, opts, M.default_options) ---@type hopper.OptionsFull
+  _options = vim.tbl_deep_extend("force", {}, opts, _default_options) ---@type hopper.OptionsFull
 end
 
 ---@return hopper.OptionsFull
 function M.options()
-  if M._options == nil then
-    return M.default_options
+  if _options == nil then
+    return _default_options
   end
-  return M._options
+  return _options
 end
 
 return M

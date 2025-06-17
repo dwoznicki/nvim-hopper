@@ -280,6 +280,7 @@ end
 ---@field conn hopper.Connection
 ---@field create_tables_stmt hopper.PreparedStatement | nil
 ---@field select_mappings_stmt hopper.PreparedStatement | nil
+---@field select_keymaps_stmt hopper.PreparedStatement | nil
 ---@field select_mapping_id_by_path_stmt hopper.PreparedStatement | nil
 ---@field select_mapping_by_keymap_stmt hopper.PreparedStatement | nil
 ---@field select_mapping_by_path_stmt hopper.PreparedStatement | nil
@@ -340,6 +341,21 @@ function SqlDatastore:list_mappings(project)
   return mappings
 end
 
+---@param project string
+---@return string[]
+function SqlDatastore:list_keymaps(project)
+  if self.select_keymaps_stmt == nil then
+    self.select_keymaps_stmt = PreparedStatement.new([[
+      SELECT keymap FROM mappings WHERE project = ?
+    ]], self.conn)
+  end
+  local results = self.select_keymaps_stmt:exec_query({project})
+  local keymaps = {} ---@type string[]
+  for _, result in ipairs(results) do
+    table.insert(keymaps, result[1])
+  end
+  return keymaps
+end
 
 ---@param project string
 ---@param keymap string

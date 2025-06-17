@@ -136,28 +136,26 @@ end
 --   x, y = QuickFileList.keymap_for_path()
 -- end
 
----@param path_tokens string[]
+---@param path string | string[]
 ---@param num_path_tokens_to_check integer
 ---@param allowed_keys table<string, any>
 ---@param assigned_keymaps table<string, any>
----@return string, [integer, integer, integer, integer]
-function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, assigned_keymaps)
+---@return string
+function M.keymap_for_path(path, num_path_tokens_to_check, allowed_keys, assigned_keymaps)
+  local path_tokens ---@type string[]
+  if type(path) == "table" then
+    path_tokens = path
+  else
+    path_tokens = vim.split(path, "/")
+  end
+
   local tried_first_keys = {} ---@type table<string, true>
 
   -- Try to get the first letter of the filename as the first keymap letter.
   -- We do this to try an make the keymap mnemonic.
   -- If we can't find a valid candidate, we'll try the next letter in the filename, and so on.
-  for i = #path_tokens, #path_tokens - num_path_tokens_to_check, -1 do
+  for i = #path_tokens, math.max(#path_tokens - num_path_tokens_to_check, 1), -1 do
     local path_token = path_tokens[i]
-
-    -- if i == #path_token then
-    --   -- If this path token is the filename, remove the extension. It would be kinda odd to use the
-    --   -- extension to determine the second key.
-    --   local filename = vim.fn.fnamemodify(path_tokens[#path_tokens - 1], ":t")
-    --   local file_ext = ". " .. vim.fn.fnamemodify(filename, ":e")
-    --   local filename_without_ext = string.sub(filename, 1, -(#file_ext + 1))
-    --   path_token = filename_without_ext
-    -- end
 
     local first_char = nil ---@type string | nil
     local first_char_idx = -1 ---@type integer
@@ -181,11 +179,12 @@ function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, 
           and assigned_keymaps[possible_keymap] == nil
         then
           -- We found an available keymap. Hooray!
-          return possible_keymap, {i, first_char_idx, i, j}
+          -- return possible_keymap, {i, first_char_idx, i, j}
+          return possible_keymap
         end
       end
       -- Second, look for available characters the other significant path tokens.
-      for j = #path_tokens, #path_tokens - num_path_tokens_to_check, -1 do
+      for j = #path_tokens, math.max(#path_tokens - num_path_tokens_to_check, 1), -1 do
         if j ~= i then
           local other_path_token = path_tokens[k]
           local other_path_token_chars = vim.split(other_path_token, "")
@@ -194,7 +193,8 @@ function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, 
             local possible_keymap = first_char .. char
             if allowed_keys[char] ~= nil and assigned_keymaps[possible_keymap] == nil then
               -- We found an available keymap. Hooray!
-              return possible_keymap, {i, first_char_idx, j, k}
+              -- return possible_keymap, {i, first_char_idx, j, k}
+              return possible_keymap
             end
           end
         end
@@ -203,7 +203,8 @@ function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, 
       for char, _ in pairs(allowed_keys) do
         local possible_keymap = first_char .. char
         if assigned_keymaps[possible_keymap] == nil then
-          return possible_keymap, {i, first_char_idx, -1, -1}
+          -- return possible_keymap, {i, first_char_idx, -1, -1}
+          return possible_keymap
         end
       end
       -- We failed to find a good keymap with thie first character. This probably means this
@@ -217,7 +218,8 @@ function M.keymap_for_path(path_tokens, num_path_tokens_to_check, allowed_keys, 
     for second_char, _ in pairs(allowed_keys) do
       local possible_keymap = first_char .. second_char
       if assigned_keymaps[possible_keymap] == nil then
-        return possible_keymap, {-1, -1, -1, -1}
+        -- return possible_keymap, {-1, -1, -1, -1}
+        return possible_keymap
       end
     end
   end

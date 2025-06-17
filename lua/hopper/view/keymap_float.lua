@@ -116,6 +116,13 @@ function KeymapFloatingWindow:draw()
   else
     table.insert(help_line, {"󰌑  Confirm", "Comment"})
   end
+  table.insert(help_line, {"  "})
+  if string.len(value) < 1 then
+    table.insert(help_line, {"󰌒 ", "String"})
+    table.insert(help_line, {" Suggest"})
+  else
+    table.insert(help_line, {"󰌒  Suggest", "Comment"})
+  end
 
   local error_line = nil ---@type string[][]
   local next_win_height ---@type integer
@@ -153,6 +160,19 @@ function KeymapFloatingWindow:confirm()
   datastore:set_mapping(self.project, self.path, self.keymap)
   self:close()
 end
+
+function KeymapFloatingWindow:suggest_keymap()
+  local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
+  if string.len(value) > 0 then
+    return
+  end
+  local datastore = require("hopper.db").datastore()
+  local assigned_keymaps = utils.set(datastore:list_keymaps(self.project))
+  local allowed_keys = utils.set(require("hopper.options").options().files.keyset)
+  local suggested_keymap = quickfile.keymap_for_path(self.path, 4, allowed_keys, assigned_keymaps)
+  vim.api.nvim_buf_set_lines(self.buf, 0, 1, false, {suggested_keymap})
+end
+
 
 function KeymapFloatingWindow:close()
   if vim.api.nvim_win_is_valid(self.win) then
@@ -192,6 +212,14 @@ function KeymapFloatingWindow:_attach_event_handlers()
     "<esc>",
     function()
       self:close()
+    end,
+    {noremap = true, silent = true, nowait = true, buffer = buf}
+  )
+  vim.keymap.set(
+    {"i", "n"},
+    "<tab>",
+    function()
+      self:suggest_keymap()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
@@ -272,14 +300,14 @@ function KeymapFloatingWindow:_keymap_ok()
   return true
 end
 
-local float = nil ---@type hopper.KeymapFloatingWindow | nil
+local _float = nil ---@type hopper.KeymapFloatingWindow | nil
 
 ---@return hopper.KeymapFloatingWindow
 function M.float()
-  if float == nil then
-    float = KeymapFloatingWindow._new()
+  if _float == nil then
+    _float = KeymapFloatingWindow._new()
   end
-  return float
+  return _float
 end
 
 return M
