@@ -173,17 +173,10 @@ function KeymapFloatingWindow:suggest_keymap()
   vim.api.nvim_buf_set_lines(self.buf, 0, 1, false, {suggested_keymap})
 end
 
-
 function KeymapFloatingWindow:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
   end
-  -- if vim.api.nvim_win_is_valid(self.helper_win) then
-  --   vim.api.nvim_win_close(self.helper_win, true)
-  -- end
-  -- if vim.api.nvim_win_is_valid(self.container_win) then
-  --   vim.api.nvim_win_close(self.container_win, true)
-  -- end
   KeymapFloatingWindow._reset(self)
 end
 
@@ -267,24 +260,6 @@ function KeymapFloatingWindow:_attach_event_handlers()
       self:close()
     end,
   })
-
-  -- require("bufhopper.integrations").clear_whichkey(buf)
-
-  -- Close the float when the cursor leaves.
-  -- vim.api.nvim_create_autocmd("WinLeave", {
-  --   buffer = buf,
-  --   once = true,
-  --   callback = function()
-  --     state.get_floating_window():close()
-  --   end,
-  -- })
-  -- vim.api.nvim_create_autocmd("BufWipeout", {
-  --   buffer = buf,
-  --   once = true,
-  --   callback = function()
-  --     state.get_floating_window():close()
-  --   end,
-  -- })
 end
 
 ---@return boolean

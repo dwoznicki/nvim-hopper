@@ -10,7 +10,15 @@ function M.choose_keymap()
     existing_keymap = existing_mapping.keymap
   end
   local keymap_float = require("hopper.view.keymap_float").float()
-  keymap_float:open("x", path, existing_keymap)
+  keymap_float:open(project, path, existing_keymap)
+end
+
+function M.open_file_hopper()
+  local project = "x"
+  local datastore = require("hopper.db").datastore()
+  local mappings = datastore:list_mappings(project)
+  local mappings_float = require("hopper.view.mappings_float").float()
+  mappings_float:open(project, mappings)
 end
 
 return M

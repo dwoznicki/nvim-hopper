@@ -25,5 +25,6 @@ function M.setup(options)
 end
 
 M.choose_keymap = require("hopper.actions").choose_keymap
+M.open_file_hopper = require("hopper.actions").open_file_hopper
 
 return M

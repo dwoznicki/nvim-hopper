@@ -41,12 +41,12 @@ function QuickFileList.new(project)
   return qfile_list
 end
 
-function QuickFileList:populate()
-  self:_populate_from_datastore()
-  -- self:_populate_from_open_buffers()
-  self:_determine_significant_path_tokens()
-  -- self:_assign_missing_keymaps()
-end
+-- function QuickFileList:populate()
+--   self:_populate_from_datastore()
+--   -- self:_populate_from_open_buffers()
+--   self:_determine_significant_path_tokens()
+--   -- self:_assign_missing_keymaps()
+-- end
 
 ---@param qfile hopper.QuickFile
 function QuickFileList:add(qfile)
@@ -68,14 +68,14 @@ function QuickFileList:add(qfile)
   end
 end
 
-function QuickFileList:_populate_from_datastore()
-  local datastore = require("hopper.db").datastore()
-  for _, item in ipairs(datastore:get_quick_files(self.project)) do
-    local path, keymap = item[1], item[2]
-    local qfile = QuickFile.new(path, keymap)
-    self:add(qfile)
-  end
-end
+-- function QuickFileList:_populate_from_datastore()
+--   local datastore = require("hopper.db").datastore()
+--   for _, item in ipairs(datastore:get_quick_files(self.project)) do
+--     local path, keymap = item[1], item[2]
+--     local qfile = QuickFile.new(path, keymap)
+--     self:add(qfile)
+--   end
+-- end
 
 -- -- This must be called after `_populate_from_datastore`!
 -- function QuickFileList:_populate_from_open_buffers()
