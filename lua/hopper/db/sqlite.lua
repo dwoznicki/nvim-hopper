@@ -279,15 +279,14 @@ end
 ---@class hopper.SqlDatastore
 ---@field conn hopper.Connection
 ---@field create_tables_stmt hopper.PreparedStatement | nil
----@field select_mappings_stmt hopper.PreparedStatement | nil
+---@field select_files_stmt hopper.PreparedStatement | nil
 ---@field select_keymaps_stmt hopper.PreparedStatement | nil
----@field select_mapping_id_by_path_stmt hopper.PreparedStatement | nil
----@field select_mapping_by_keymap_stmt hopper.PreparedStatement | nil
----@field select_mapping_by_path_stmt hopper.PreparedStatement | nil
----@field insert_mapping_stmt hopper.PreparedStatement | nil
----@field update_mapping_stmt hopper.PreparedStatement | nil
----@field delete_mapping_stmt hopper.PreparedStatement | nil
----@field update_usage_stmt hopper.PreparedStatement | nil
+---@field select_file_id_by_path_stmt hopper.PreparedStatement | nil
+---@field select_file_by_keymap_stmt hopper.PreparedStatement | nil
+---@field select_file_by_path_stmt hopper.PreparedStatement | nil
+---@field insert_file_stmt hopper.PreparedStatement | nil
+---@field update_file_stmt hopper.PreparedStatement | nil
+---@field delete_file_stmt hopper.PreparedStatement | nil
 local SqlDatastore = {}
 SqlDatastore.__index = SqlDatastore
 M.SqlDatastore = SqlDatastore
@@ -303,7 +302,7 @@ end
 function SqlDatastore:init()
   if self.create_tables_stmt == nil then
     self.create_tables_stmt = PreparedStatement.new([[
-      CREATE TABLE IF NOT EXISTS mappings (
+      CREATE TABLE IF NOT EXISTS file_mappings (
         id INTEGER PRIMARY KEY,
         project TEXT NOT NULL,
         path TEXT NOT NULL,
@@ -312,33 +311,33 @@ function SqlDatastore:init()
         UNIQUE (project, path),
         UNIQUE (project, keymap)
       );
-      CREATE INDEX mappings_project_idx ON mappings (project);
+      CREATE INDEX file_mappings_project_idx ON file_mappings (project);
     ]], self.conn)
   end
   self.create_tables_stmt:exec_update()
 end
 
----@alias hopper.Mapping {id: integer, project: string, path: string, keymap: string}
+---@alias hopper.FileMapping {id: integer, project: string, path: string, keymap: string}
 
 ---@param project string
----@return hopper.Mapping[]
-function SqlDatastore:list_mappings(project)
-  if self.select_mappings_stmt == nil then
-    self.select_mappings_stmt = PreparedStatement.new([[
-      SELECT id, project, path, keymap FROM mappings WHERE project = ? ORDER BY created
+---@return hopper.FileMapping[]
+function SqlDatastore:list_files(project)
+  if self.select_files_stmt == nil then
+    self.select_files_stmt = PreparedStatement.new([[
+      SELECT id, project, path, keymap FROM file_mappings WHERE project = ? ORDER BY created
     ]], self.conn)
   end
-  local results = self.select_mappings_stmt:exec_query({project})
-  local mappings = {} ---@type hopper.Mapping[]
+  local results = self.select_files_stmt:exec_query({project})
+  local files = {} ---@type hopper.FileMapping[]
   for _, result in ipairs(results) do
-    table.insert(mappings, {
+    table.insert(files, {
       id = result[1],
       project = result[2],
       path = result[3],
       keymap = result[4],
     })
   end
-  return mappings
+  return files
 end
 
 ---@param project string
@@ -346,7 +345,7 @@ end
 function SqlDatastore:list_keymaps(project)
   if self.select_keymaps_stmt == nil then
     self.select_keymaps_stmt = PreparedStatement.new([[
-      SELECT keymap FROM mappings WHERE project = ?
+      SELECT keymap FROM file_mappings WHERE project = ?
     ]], self.conn)
   end
   local results = self.select_keymaps_stmt:exec_query({project})
@@ -359,14 +358,14 @@ end
 
 ---@param project string
 ---@param keymap string
----@return hopper.Mapping | nil
-function SqlDatastore:get_mapping_by_keymap(project, keymap)
-  if self.select_mapping_by_keymap_stmt == nil then
-    self.select_mapping_by_keymap_stmt = PreparedStatement.new([[
-      SELECT id, project, path, keymap FROM mappings WHERE project = ? AND keymap = ?
+---@return hopper.FileMapping | nil
+function SqlDatastore:get_file_by_keymap(project, keymap)
+  if self.select_file_by_keymap_stmt == nil then
+    self.select_file_by_keymap_stmt = PreparedStatement.new([[
+      SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND keymap = ?
     ]], self.conn)
   end
-  local results = self.select_mapping_by_keymap_stmt:exec_query({project, keymap})
+  local results = self.select_file_by_keymap_stmt:exec_query({project, keymap})
   if #results < 1 then
     return nil
   end
@@ -380,14 +379,14 @@ end
 
 ---@param project string
 ---@param path string
----@return hopper.Mapping | nil
-function SqlDatastore:get_mapping_by_path(project, path)
-  if self.select_mapping_by_path_stmt == nil then
-    self.select_mapping_by_path_stmt = PreparedStatement.new([[
-      SELECT id, project, path, keymap FROM mappings WHERE project = ? AND path = ?
+---@return hopper.FileMapping | nil
+function SqlDatastore:get_file_by_path(project, path)
+  if self.select_file_by_path_stmt == nil then
+    self.select_file_by_path_stmt = PreparedStatement.new([[
+      SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND path = ?
     ]], self.conn)
   end
-  local results = self.select_mapping_by_path_stmt:exec_query({project, path})
+  local results = self.select_file_by_path_stmt:exec_query({project, path})
   if #results < 1 then
     return nil
   end
@@ -402,40 +401,40 @@ end
 ---@param project string
 ---@param path string
 ---@param keymap string
-function SqlDatastore:set_mapping(project, path, keymap)
-  if self.select_mapping_id_by_path_stmt == nil then
-    self.select_mapping_id_by_path_stmt = PreparedStatement.new([[
-      SELECT id FROM mappings WHERE project = ? AND path = ?
+function SqlDatastore:set_file(project, path, keymap)
+  if self.select_file_id_by_path_stmt == nil then
+    self.select_file_id_by_path_stmt = PreparedStatement.new([[
+      SELECT id FROM file_mappings WHERE project = ? AND path = ?
     ]], self.conn)
   end
-  local results = self.select_mapping_id_by_path_stmt:exec_query({project, path})
+  local results = self.select_file_id_by_path_stmt:exec_query({project, path})
   if #results < 1 then
-    if self.insert_mapping_stmt == nil then
-      self.insert_mapping_stmt = PreparedStatement.new([[
-        INSERT INTO mappings (project, path, keymap, created)
+    if self.insert_file_stmt == nil then
+      self.insert_file_stmt = PreparedStatement.new([[
+        INSERT INTO file_mappings (project, path, keymap, created)
         VALUES (?, ?, ?, unixepoch())
       ]], self.conn)
     end
-    self.insert_mapping_stmt:exec_update({project, path, keymap})
+    self.insert_file_stmt:exec_update({project, path, keymap})
   else
-    if self.update_mapping_stmt == nil then
-      self.update_mapping_stmt = PreparedStatement.new([[
-        UPDATE mappings SET keymap = ? WHERE id = ?
+    if self.update_file_stmt == nil then
+      self.update_file_stmt = PreparedStatement.new([[
+        UPDATE file_mappings SET keymap = ? WHERE id = ?
       ]], self.conn)
     end
-    self.update_mapping_stmt:exec_update({keymap, results[1][1]})
+    self.update_file_stmt:exec_update({keymap, results[1][1]})
   end
 end
 
 ---@param project string
 ---@param path string
-function SqlDatastore:remove_mapping(project, path)
-  if self.delete_mapping_stmt == nil then
-    self.delete_mapping_stmt = PreparedStatement.new([[
-      DELETE FROM mappings WHERE project = ? AND path = ?
+function SqlDatastore:remove_file(project, path)
+  if self.delete_file_stmt == nil then
+    self.delete_file_stmt = PreparedStatement.new([[
+      DELETE FROM file_mappings WHERE project = ? AND path = ?
     ]], self.conn)
   end
-  self.delete_mapping_stmt:exec_update({project, path})
+  self.delete_file_stmt:exec_update({project, path})
 end
 
 return M

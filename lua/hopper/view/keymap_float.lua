@@ -17,7 +17,7 @@ local M = {}
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer
----@field conflicting_mapping hopper.Mapping | nil
+---@field conflicting_mapping hopper.FileMapping | nil
 local KeymapFloatingWindow = {}
 KeymapFloatingWindow.__index = KeymapFloatingWindow
 M.KeymapFloatingWindow = KeymapFloatingWindow
@@ -157,7 +157,7 @@ function KeymapFloatingWindow:confirm()
     return
   end
   local datastore = require("hopper.db").datastore()
-  datastore:set_mapping(self.project, self.path, self.keymap)
+  datastore:set_file(self.project, self.path, self.keymap)
   self:close()
 end
 
@@ -230,7 +230,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
       local float = self
       loop.new_timer():start(0, 0, function()
         local datastore = require("hopper.db").datastore()
-        local mapping = datastore:get_mapping_by_keymap(float.project, float.keymap)
+        local mapping = datastore:get_file_by_keymap(float.project, float.keymap)
         vim.schedule(function()
           if mapping ~= nil and mapping.path == float.path then
             mapping = nil

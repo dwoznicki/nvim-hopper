@@ -7,8 +7,8 @@ local M = {}
 
 ---@class hopper.FilesFloatingWindow
 ---@field project string
----@field mappings hopper.Mapping[]
----@field visible_mappings hopper.Mapping[]
+---@field mappings hopper.FileMapping[]
+---@field visible_mappings hopper.FileMapping[]
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer
@@ -35,7 +35,7 @@ function FilesFloatingWindow._reset(float)
 end
 
 ---@param project string
----@param mappings hopper.Mapping[]
+---@param mappings hopper.FileMapping[]
 function FilesFloatingWindow:open(project, mappings)
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, win_height = utils.get_win_dimensions()

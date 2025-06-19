@@ -4,7 +4,7 @@ function M.choose_keymap()
   local project = "x"
   local path = require("hopper.filepath").get_path_from_project_root(vim.api.nvim_buf_get_name(0))
   local datastore = require("hopper.db").datastore()
-  local existing_mapping = datastore:get_mapping_by_path(project, path)
+  local existing_mapping = datastore:get_file_by_path(project, path)
   local existing_keymap = nil ---@type string | nil
   if existing_mapping ~= nil then
     existing_keymap = existing_mapping.keymap
@@ -16,7 +16,7 @@ end
 function M.open_file_hopper()
   local project = "x"
   local datastore = require("hopper.db").datastore()
-  local mappings = datastore:list_mappings(project)
+  local mappings = datastore:list_files(project)
   local mappings_float = require("hopper.view.mappings_float").float()
   mappings_float:open(project, mappings)
 end
