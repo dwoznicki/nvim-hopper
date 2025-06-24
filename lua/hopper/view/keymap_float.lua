@@ -220,11 +220,9 @@ function KeymapFloatingWindow:_attach_event_handlers()
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged"}, {
     buffer = buf,
     callback = function()
-      local value = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
-      if string.len(value) > num_chars then
-        value = value:sub(1, num_chars)
-        vim.api.nvim_buf_set_lines(buf, 0, 1, false, {value})
-      end
+      -- Clear the `modified` flag for prompt.
+      vim.bo[buf].modified = false
+      local value = utils.clamp_buffer_value(buf, num_chars)
       self.keymap = value
       self:draw()
       local float = self

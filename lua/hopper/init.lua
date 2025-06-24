@@ -13,6 +13,7 @@ local M = {}
 function M.setup(options)
   require("hopper.options").set_options(options)
   require("hopper.styling").setup()
+  require("hopper.usercommand").setup()
   -- local conf = config.default_config()
   -- if options ~= nil then
   --   conf = vim.tbl_deep_extend("force", {}, conf, options) ---@type BufhopperConfig

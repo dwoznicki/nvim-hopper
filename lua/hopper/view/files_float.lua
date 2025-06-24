@@ -1,14 +1,20 @@
 local utils = require("hopper.utils")
 local quickfile = require("hopper.quickfile")
 
-local ns_id = vim.api.nvim_create_namespace("hopper.KeymapFloatingWindow")
+local ns_id = vim.api.nvim_create_namespace("hopper.FilesFloatingWindow")
+--TODO: Make this configurable.
+local num_chars = 2
 
 local M = {}
 
+---@alias hopper.KeymapFileTree table<string, hopper.KeymapFileNode>
+---@alias hopper.KeymapFileNode hopper.KeymapFileTree | hopper.FileMapping
+
 ---@class hopper.FilesFloatingWindow
 ---@field project string
----@field mappings hopper.FileMapping[]
----@field visible_mappings hopper.FileMapping[]
+---@field files hopper.FileMapping[]
+---@field keymap_file_tree hopper.KeymapFileTree
+---@field filtered_files hopper.FileMapping[]
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer
@@ -27,31 +33,30 @@ end
 ---@param float hopper.FilesFloatingWindow
 function FilesFloatingWindow._reset(float)
   float.project = ""
-  float.mappings = {}
-  float.visible_mappings = {}
+  float.files = {}
+  float.keymap_file_tree = {}
+  float.filtered_files = {}
   float.buf = -1
   float.win = -1
   float.win_width = -1
 end
 
 ---@param project string
----@param mappings hopper.FileMapping[]
-function FilesFloatingWindow:open(project, mappings)
+---@param files hopper.FileMapping[]
+function FilesFloatingWindow:open(project, files)
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, win_height = utils.get_win_dimensions()
   self.win_width = win_width
 
   self.project = project
-  self.mappings = mappings
-  self.visible_mappings = mappings
+  self:_set_files(files)
 
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
+  vim.api.nvim_set_option_value("buftype", "prompt", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
   vim.api.nvim_set_option_value("buflisted", false, {buf = buf})
-  vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
-  vim.api.nvim_set_option_value("filetype", "HopperMappingFloat", {buf = buf})
+  vim.api.nvim_set_option_value("filetype", "HopperFilesFloat", {buf = buf})
   ---@type vim.api.keyset.win_config
   local win_config = {
     style = "minimal",
@@ -61,12 +66,19 @@ function FilesFloatingWindow:open(project, mappings)
     row = 3,
     col = math.floor((ui.width - win_width) * 0.5),
     focusable = true,
-    title = " Mappings ",
+    title = " Files ",
     title_pos = "center",
     border = "rounded",
   }
-  -- -- Don't show the prompt text.
-  -- vim.fn.prompt_setprompt(buf, "")
+  -- Don't show the prompt text.
+  vim.fn.prompt_setprompt(buf, "")
+  -- Start in insert mode so user can immediately start typing.
+  vim.api.nvim_create_autocmd("BufEnter", {
+    buffer = buf,
+    callback = function()
+      vim.cmd("startinsert")
+    end,
+  })
   -- -- If there is an existing mapping, pre-populate it.
   -- -- Otherwise, start in insert mode so user can immediately start typing.
   -- if existing_keymap then
@@ -88,23 +100,37 @@ function FilesFloatingWindow:open(project, mappings)
   self:draw()
 end
 
+-- function FilesFloatingWindow:attach_keymaps()
+--   for _, file in ipairs(self.visible_files) do
+--   end
+-- end
+
 function FilesFloatingWindow:draw()
-  local lines = {} ---@type string[]
-  local highlights = {} ---@type hopper.HighlightLocation[]
+  vim.api.nvim_buf_clear_namespace(self.buf, ns_id, 0, -1) -- clear highlights
 
-  for _, mapping in ipairs(self.visible_mappings) do
-    local keymap_indexes = quickfile.keymap_location_in_path(mapping.path, mapping.keymap, {missing_behavior = "nearby"})
-    table.insert(lines, mapping.path)
+  local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
+  local used = string.len(value)
+  vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
+    virt_text = {
+      {string.format("%d/%d", used, num_chars), "Comment"}
+    },
+    virt_text_pos = "right_align",
+  })
+
+  local virtual_lines = {} ---@type string[][][]
+
+  local next_key_index = used + 1
+  for _, file in ipairs(self.filtered_files) do
+    local keymap_indexes = quickfile.keymap_location_in_path(file.path, file.keymap, {missing_behavior = "nearby"})
+    local path_line = quickfile.highlight_path_virtual_text(file.path, file.keymap, keymap_indexes, {next_key_index = next_key_index})
+    table.insert(virtual_lines, path_line)
   end
 
-  vim.api.nvim_set_option_value("modifiable", true, {buf = self.buf})
-  vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, {}) -- clear lines
-  vim.api.nvim_buf_clear_namespace(self.buf, 0, 0, -1) -- clear highlights
-  vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, lines) -- draw lines
-  for _, hl in ipairs(highlights) do -- add highlights
-    vim.api.nvim_buf_add_highlight(self.buf, 0, hl.name, hl.row, hl.col_start, hl.col_end)
-  end
-  vim.api.nvim_set_option_value("modifiable", false, {buf = self.buf})
+  vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
+    virt_lines = virtual_lines,
+    virt_lines_above = false,
+    virt_lines_leftcol = false,
+  })
 end
 
 function FilesFloatingWindow:close()
@@ -112,6 +138,27 @@ function FilesFloatingWindow:close()
     vim.api.nvim_win_close(self.win, true)
   end
   FilesFloatingWindow._reset(self)
+end
+
+---@param files hopper.FileMapping[]
+function FilesFloatingWindow:_set_files(files)
+  local tree = {} ---@type hopper.KeymapFileTree
+  for _, file in ipairs(files) do
+    local node = tree ---@type hopper.KeymapFileNode | hopper.KeymapFileTree
+    for i = 1, string.len(file.keymap) do
+      local key = string.sub(file.keymap, i, i)
+      if node[key] == nil then
+        node[key] = {} ---@type hopper.KeymapFileTree
+      end
+      if i == string.len(file.keymap) then
+        node[key] = file
+      end
+      node = node[key]
+    end
+  end
+  self.files = files
+  self.filtered_files = files
+  self.keymap_file_tree = tree
 end
 
 function FilesFloatingWindow:_attach_event_handlers()
@@ -135,6 +182,55 @@ function FilesFloatingWindow:_attach_event_handlers()
   --   end,
   --   {noremap = true, silent = true, nowait = true, buffer = buf}
   -- )
+
+  -- -- prevent the user ever leaving insert mode:
+  -- vim.api.nvim_create_autocmd("InsertLeave", {
+  --   buffer = buf,
+  --   callback = function()
+  --     local value = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
+  --     if string.len(value) > 0 then
+  --       vim.api.nvim_buf_set_lines(buf, 0, 1, false, {""})
+  --     end
+  --   end,
+  -- })
+
+  vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged"}, {
+    buffer = buf,
+    callback = function()
+      -- Clear the `modified` flag for prompt.
+      vim.bo[buf].modified = false
+      local value = utils.clamp_buffer_value(buf, num_chars)
+      vim.print(value)
+      if string.len(value) < 1 then
+        self.filtered_files = self.files
+        self:draw()
+        return
+      end
+      local selected = vim.tbl_get(self.keymap_file_tree, unpack(vim.split(value, ""))) ---@type hopper.FileMapping | hopper.KeymapFileTree | nil
+      if selected == nil then
+        self.filtered_files = {}
+        self:draw()
+        return
+      end
+      if selected.path then
+        vim.print(selected)
+        self:draw()
+      else
+        local filtered_files = {} ---@type hopper.FileMapping[]
+        local stack = vim.tbl_values(selected) ---@type (hopper.FileMapping | hopper.KeymapFileNode)[]
+        while #stack > 0 do
+          local item = table.remove(stack, 1) ---@type hopper.FileMapping | hopper.KeymapFileNode
+          if item.path then
+            table.insert(filtered_files, item)
+          else
+            table.insert(stack, item)
+          end
+        end
+        self.filtered_files = filtered_files
+        self:draw()
+      end
+    end,
+  })
 
   -- Close on "<esc>" keypress.
   vim.keymap.set(

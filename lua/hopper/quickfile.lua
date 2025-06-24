@@ -132,10 +132,6 @@ function QuickFileList:_determine_significant_path_tokens()
   end
 end
 
--- function QuickFileList:_assign_missing_keymaps()
---   x, y = QuickFileList.keymap_for_path()
--- end
-
 ---@param path string | string[]
 ---@param num_path_tokens_to_check integer
 ---@param allowed_keys table<string, any>
@@ -186,9 +182,9 @@ function M.keymap_for_path(path, num_path_tokens_to_check, allowed_keys, assigne
       -- Second, look for available characters the other significant path tokens.
       for j = #path_tokens, math.max(#path_tokens - num_path_tokens_to_check, 1), -1 do
         if j ~= i then
-          local other_path_token = path_tokens[k]
+          local other_path_token = path_tokens[j]
           local other_path_token_chars = vim.split(other_path_token, "")
-          for k, char in ipairs(other_path_token_chars) do
+          for _, char in ipairs(other_path_token_chars) do
             char = string.lower(char)
             local possible_keymap = first_char .. char
             if allowed_keys[char] ~= nil and assigned_keymaps[possible_keymap] == nil then
@@ -359,11 +355,18 @@ function M.keymap_location_in_path(path, keymap, opts)
   return path_indexes
 end
 
+---@class hopper.HighlightPathOptions
+---@field next_key_index integer
+
 ---@param path string
 ---@param keymap string
 ---@param keymap_indexes integer[]
+---@param opts? hopper.HighlightPathOptions
 ---@return string[][]
-function M.highlight_path_virtual_text(path, keymap, keymap_indexes)
+function M.highlight_path_virtual_text(path, keymap, keymap_indexes, opts)
+  opts = opts or {}
+  local next_key_index = opts.next_key_index or -1
+
   local highlighted_parts = {} ---@type string[][]
   local start_idx = 1
   local sorted_indexes = require("hopper.utils").sorted(keymap_indexes)
@@ -373,10 +376,18 @@ function M.highlight_path_virtual_text(path, keymap, keymap_indexes)
     local hl_name ---@type string
     if idx == keymap_indexes[1] then
       key = string.sub(keymap, 1, 1)
-      hl_name = "hopper.hl.FirstKey"
+      if next_key_index == 1 then
+        hl_name = "hopper.hl.FirstKeyNext"
+      else
+        hl_name = "hopper.hl.FirstKey"
+      end
     else
       key = string.sub(keymap, 2, 2)
-      hl_name = "hopper.hl.SecondKey"
+      if next_key_index == 2 then
+        hl_name = "hopper.hl.SecondKeyNext"
+      else
+        hl_name = "hopper.hl.SecondKey"
+      end
     end
     table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})
     table.insert(highlighted_parts, {key, hl_name})
@@ -386,6 +397,5 @@ function M.highlight_path_virtual_text(path, keymap, keymap_indexes)
   table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})
   return highlighted_parts
 end
-
 
 return M
