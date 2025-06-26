@@ -42,13 +42,15 @@ function FilesFloatingWindow._reset(float)
 end
 
 ---@param project string
----@param files hopper.FileMapping[]
-function FilesFloatingWindow:open(project, files)
+function FilesFloatingWindow:open(project)
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, win_height = utils.get_win_dimensions()
   self.win_width = win_width
 
   self.project = project
+
+  local datastore = require("hopper.db").datastore()
+  local files = datastore:list_files(project)
   self:_set_files(files)
 
   local buf = vim.api.nvim_create_buf(false, true)
@@ -242,19 +244,13 @@ function FilesFloatingWindow:_attach_event_handlers()
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
 
-  vim.api.nvim_create_autocmd("WinLeave", {
+  vim.api.nvim_create_autocmd("BufWinLeave", {
     buffer = buf,
     once = true,
     callback = function()
-      self:close()
-    end,
-  })
-
-  vim.api.nvim_create_autocmd("BufWipeout", {
-    buffer = buf,
-    once = true,
-    callback = function()
-      self:close()
+      vim.schedule(function()
+        self:close()
+      end)
     end,
   })
 end

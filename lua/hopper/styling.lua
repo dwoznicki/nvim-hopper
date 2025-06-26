@@ -77,6 +77,8 @@ local function setup_higlights()
   vim.api.nvim_set_hl(0, "hopper.hl.FirstKeyNext", {fg = palette.first_key, underline = true})
   vim.api.nvim_set_hl(0, "hopper.hl.SecondKey", {fg = palette.second_key})
   vim.api.nvim_set_hl(0, "hopper.hl.SecondKeyNext", {fg = palette.second_key, underline = true})
+
+  vim.api.nvim_set_hl(0, "hopper.hl.FloatFooter", {fg = "#DCD7BA", bg = "#2A2A37"})
 end
 
 function M.setup()

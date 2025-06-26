@@ -43,14 +43,20 @@ end
 
 ---@param project string
 ---@param path string
----@param existing_keymap string | nil
-function KeymapFloatingWindow:open(project, path, existing_keymap)
+function KeymapFloatingWindow:open(project, path)
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, _ = utils.get_win_dimensions()
   self.win_width = win_width
 
   self.project = project
   self.path = quickfile.truncate_path(path, win_width)
+
+  local datastore = require("hopper.db").datastore()
+  local existing_file = datastore:get_file_by_path(project, path)
+  local existing_keymap = nil ---@type string | nil
+  if existing_file ~= nil then
+    existing_keymap = existing_file.keymap
+  end
   self.keymap = existing_keymap or ""
 
   local buf = vim.api.nvim_create_buf(false, true)
@@ -127,9 +133,11 @@ function KeymapFloatingWindow:draw()
   local error_line = nil ---@type string[][]
   local next_win_height ---@type integer
   if self.conflicting_mapping ~= nil then
+    local errmsg = "Conflicting mapping found: "
+    local conflicting_path = quickfile.truncate_path(self.conflicting_mapping.path, self.win_width - vim.fn.strdisplaywidth(errmsg) - 2)
     next_win_height = 4
     error_line = {
-      {"Conflicting mapping found for file: " .. self.conflicting_mapping.path, "Error"},
+      {errmsg .. conflicting_path, "Error"},
     }
   else
     next_win_height = 3
@@ -243,19 +251,13 @@ function KeymapFloatingWindow:_attach_event_handlers()
     end,
   })
 
-  vim.api.nvim_create_autocmd("WinLeave", {
+  vim.api.nvim_create_autocmd("BufWinLeave", {
     buffer = buf,
     once = true,
     callback = function()
-      self:close()
-    end,
-  })
-
-  vim.api.nvim_create_autocmd("BufWipeout", {
-    buffer = buf,
-    once = true,
-    callback = function()
-      self:close()
+      vim.schedule(function()
+        self:close()
+      end)
     end,
   })
 end

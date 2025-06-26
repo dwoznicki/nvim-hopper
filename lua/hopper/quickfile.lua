@@ -225,20 +225,37 @@ end
 
 ---@param path string
 ---@param available_width integer
----@return string truncated_path_tokens
+---@return string truncated_path
 function M.truncate_path(path, available_width)
   local path_tokens = vim.split(path, "/")
   local truncated_path_tokens = {} ---@type string[]
 
+  local has_leading_slash = false
+  if path_tokens[1] == "" then
+    -- Path started with a slash. Remove this empty token early since it makes future checks more
+    -- cumbersome.
+    table.remove(path_tokens, 1)
+    has_leading_slash = true
+  end
+
+  ---@return string
+  local function join_truncated_path_tokens()
+    local truncated_path = table.concat(truncated_path_tokens, "/")
+    if has_leading_slash and string.sub(truncated_path, 1, 1) ~= "/" then
+      truncated_path = "/" .. truncated_path
+    end
+    return truncated_path
+  end
+
   local filename = table.remove(path_tokens) ---@type string
   table.insert(truncated_path_tokens, filename)
   if #path_tokens < 1 then
-    return table.concat(truncated_path_tokens, "/")
+    return join_truncated_path_tokens()
   end
   local text_width = vim.fn.strdisplaywidth(filename) + 1
   available_width = available_width - text_width
   if available_width < 1 then
-    return table.concat(truncated_path_tokens, "/")
+    return join_truncated_path_tokens()
   end
 
   local basedir = table.remove(path_tokens, 1) ---@type string
@@ -249,7 +266,7 @@ function M.truncate_path(path, available_width)
     text_width = vim.fn.strdisplaywidth(basedir)
     next_available_width = available_width - text_width
     if next_available_width < 1 then
-      return table.concat(truncated_path_tokens, "/")
+      return join_truncated_path_tokens()
     end
   end
   table.insert(truncated_path_tokens, 1, basedir)
@@ -274,7 +291,7 @@ function M.truncate_path(path, available_width)
     table.insert(truncated_path_tokens, 2, path_token)
     available_width = next_available_width
   end
-  return table.concat(truncated_path_tokens, "/")
+  return join_truncated_path_tokens()
 end
 
 ---@class hopper.KeymapLocationInPathOptions

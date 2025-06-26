@@ -32,6 +32,12 @@ describe("quickfile utilities", function()
         quickfile.truncate_path("some-long-winded-dir-name/SomeFileName.tsx", 20)
       )
     end)
+    it("should properly truncate absolute paths #only", function()
+      assert.equal(
+        "/user/…/dummy/absolute/path.py",
+        quickfile.truncate_path("/user/somebody/dummy/absolute/path.py", 30)
+      )
+    end)
   end)
 
   describe("keymap_location_in_path", function()

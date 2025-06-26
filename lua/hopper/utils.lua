@@ -73,15 +73,4 @@ function M.clamp_buffer_value(buf, num_chars)
   return value
 end
 
----@param n integer
----@param r integer
----@return integer
-function M.count_permutations(n, r)
-  local p = 1
-  for i = 0, r - 1 do
-    p = p * (n - i)
-  end
-  return p
-end
-
 return M
