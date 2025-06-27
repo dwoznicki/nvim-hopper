@@ -9,14 +9,14 @@ end
 
 function M.open_file_hopper()
   local project = "x"
-  local files_float = require("hopper.view.files_float").float()
-  files_float:open(project)
+  local float = require("hopper.view.main").float()
+  float:open(project)
 end
 
 function M.show_available_keymaps()
   local project = "x"
-  local list = require("hopper.view.available").list()
-  list:open(project)
+  local overlay = require("hopper.view.available").overlay()
+  overlay:open(project)
 end
 
 return M

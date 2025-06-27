@@ -251,7 +251,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
     end,
   })
 
-  vim.api.nvim_create_autocmd("BufWinLeave", {
+  vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
     buffer = buf,
     once = true,
     callback = function()

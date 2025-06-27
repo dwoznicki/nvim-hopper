@@ -178,7 +178,7 @@ function AvailableKeymapsList:_attach_event_handlers()
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
 
-  vim.api.nvim_create_autocmd("BufWinLeave", {
+  vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
     buffer = buf,
     once = true,
     callback = function()
@@ -189,14 +189,14 @@ function AvailableKeymapsList:_attach_event_handlers()
   })
 end
 
-local _list = nil ---@type hopper.AvailableKeymapsList | nil
+local _overlay = nil ---@type hopper.AvailableKeymapsList | nil
 
 ---@return hopper.AvailableKeymapsList
-function M.list()
-  if _list == nil then
-    _list = AvailableKeymapsList._new()
+function M.overlay()
+  if _overlay == nil then
+    _overlay = AvailableKeymapsList._new()
   end
-  return _list
+  return _overlay
 end
 
 return M
