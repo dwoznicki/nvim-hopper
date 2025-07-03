@@ -32,9 +32,13 @@ function AvailableKeymapsList._reset(list)
   list.footer_win = -1
 end
 
----@param project string
-function AvailableKeymapsList:open(project)
-  self.project = project
+---@class hopper.OpenAvailableKeymapsOptions
+---@field project string | nil
+
+---@param opts? hopper.OpenAvailableKeymapsOptions
+function AvailableKeymapsList:open(opts)
+  opts = opts or {}
+  self.project = opts.project
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})

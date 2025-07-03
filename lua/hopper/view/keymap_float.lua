@@ -18,6 +18,7 @@ local M = {}
 ---@field win integer
 ---@field win_width integer
 ---@field conflicting_mapping hopper.FileMapping | nil
+---@field go_back_callback function | nil
 local KeymapFloatingWindow = {}
 KeymapFloatingWindow.__index = KeymapFloatingWindow
 M.KeymapFloatingWindow = KeymapFloatingWindow
@@ -39,20 +40,28 @@ function KeymapFloatingWindow._reset(float)
   float.win = -1
   float.win_width = -1
   float.conflicting_mapping = nil
+  float.go_back_callback = nil
 end
 
----@param project string
+---@class hopper.OpenNewKeymapFloatOptions
+---@field project string | nil
+---@field go_back function | nil
+
 ---@param path string
-function KeymapFloatingWindow:open(project, path)
+---@param opts? hopper.OpenNewKeymapFloatOptions
+function KeymapFloatingWindow:open(path, opts)
+  opts = opts or {}
+  self.project = opts.project
+  self.go_back_callback = opts.go_back
+
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, _ = utils.get_win_dimensions()
   self.win_width = win_width
 
-  self.project = project
   self.path = quickfile.truncate_path(path, win_width)
 
   local datastore = require("hopper.db").datastore()
-  local existing_file = datastore:get_file_by_path(project, path)
+  local existing_file = datastore:get_file_by_path(self.project, path)
   local existing_keymap = nil ---@type string | nil
   if existing_file ~= nil then
     existing_keymap = existing_file.keymap
@@ -129,6 +138,16 @@ function KeymapFloatingWindow:draw()
   else
     table.insert(help_line, {"󰌒  Suggest", "Comment"})
   end
+  if self.go_back_callback ~= nil then
+    table.insert(help_line, {"  "})
+    local curr_mode = vim.api.nvim_get_mode().mode
+    if curr_mode == "n" then
+      table.insert(help_line, {"󰁮 ", "Warning"})
+      table.insert(help_line, {" Back"})
+    else
+      table.insert(help_line, {"󰁮  Back", "Comment"})
+    end
+  end
 
   local error_line = nil ---@type string[][]
   local next_win_height ---@type integer
@@ -198,7 +217,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
-  -- Close on "q" keypress.
+  -- Close on q keypress.
   vim.keymap.set(
     "n",
     "q",
@@ -207,7 +226,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
-  -- Close on "<esc>" keypress.
+  -- Close on esc keypress.
   vim.keymap.set(
     "n",
     "<esc>",
@@ -216,6 +235,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
+  -- Fill keymap suggestion on tab keypress.
   vim.keymap.set(
     {"i", "n"},
     "<tab>",
@@ -224,6 +244,17 @@ function KeymapFloatingWindow:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
+  if self.go_back_callback ~= nil then
+    -- Go back to previous view on backspace keypress.
+    vim.keymap.set(
+      "n",
+      "<bs>",
+      function()
+        self.go_back_callback()
+      end,
+      {noremap = true, silent = true, nowait = true, buffer = buf}
+    )
+  end
 
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged"}, {
     buffer = buf,
