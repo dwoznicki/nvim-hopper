@@ -5,46 +5,49 @@ local num_chars = 2
 
 local M = {}
 
----@class hopper.AvailableKeymapsList
----@field project string
+---@class hopper.InfoOverlay
+---@field is_open boolean
+---@field project hopper.Project | nil
 ---@field buf integer
 ---@field win integer
 ---@field footer_buf integer
 ---@field footer_win integer
-local AvailableKeymapsList = {}
-AvailableKeymapsList.__index = AvailableKeymapsList
-M.AvailableKeymapsList = AvailableKeymapsList
+local InfoOverlay = {}
+InfoOverlay.__index = InfoOverlay
+M.InfoOverlay = InfoOverlay
 
----@return hopper.AvailableKeymapsList
-function AvailableKeymapsList._new()
+---@return hopper.InfoOverlay
+function InfoOverlay._new()
   local list = {}
-  setmetatable(list, AvailableKeymapsList)
-  AvailableKeymapsList._reset(list)
+  setmetatable(list, InfoOverlay)
+  InfoOverlay._reset(list)
   return list
 end
 
----@param list hopper.AvailableKeymapsList
-function AvailableKeymapsList._reset(list)
-  list.project = ""
-  list.buf = -1
-  list.win = -1
-  list.footer_buf = -1
-  list.footer_win = -1
+---@param overlay hopper.InfoOverlay
+function InfoOverlay._reset(overlay)
+  overlay.is_open = false
+  overlay.project = nil
+  overlay.buf = -1
+  overlay.win = -1
+  overlay.footer_buf = -1
+  overlay.footer_win = -1
 end
 
----@class hopper.OpenAvailableKeymapsOptions
----@field project string | nil
+---@class hopper.OpenInfoOverlayOptions
+---@field project hopper.Project | string | nil
 
----@param opts? hopper.OpenAvailableKeymapsOptions
-function AvailableKeymapsList:open(opts)
+---@param opts? hopper.OpenInfoOverlayOptions
+function InfoOverlay:open(opts)
   opts = opts or {}
-  self.project = opts.project
+  self.project = require("hopper.projects").current_project(opts.project)
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
   vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
+  vim.api.nvim_set_option_value("filetype", "markdown", {buf = buf})
 
   local ui = vim.api.nvim_list_uis()[1]
   ---@type vim.api.keyset.win_config
@@ -87,10 +90,11 @@ function AvailableKeymapsList:open(opts)
 
   self:_attach_event_handlers()
 
+  self.is_open = true
   self:init()
 end
 
-function AvailableKeymapsList:init()
+function InfoOverlay:init()
   local footer_buf = self.footer_buf
   local buf = self.buf
 
@@ -110,7 +114,7 @@ function AvailableKeymapsList:init()
   local loop = vim.uv or vim.loop
   loop.new_timer():start(0, 0, function()
     local datastore = require("hopper.db").datastore()
-    local existing_keymaps = utils.set(datastore:list_keymaps(self.project))
+    local existing_keymaps = utils.set(datastore:list_keymaps(self.project.name))
     local allowed_keys = require("hopper.options").options().files.keyset
     local num_allowed_keys = #allowed_keys
     local total_keymap_permutions = num_allowed_keys ^ num_chars
@@ -153,23 +157,30 @@ function AvailableKeymapsList:init()
     end
     vim.schedule(function()
       vim.api.nvim_set_option_value("modifiable", true, {buf = buf})
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false, available_keymaps)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "## Project",
+        string.format("%s - %s", self.project.name, self.project.path),
+        "",
+        "## Available keymaps",
+        unpack(available_keymaps),
+      })
+      -- vim.api.nvim_buf_set_lines(buf, 2, -1, false, available_keymaps)
       vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
     end)
   end)
 end
 
-function AvailableKeymapsList:close()
+function InfoOverlay:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
   end
   if vim.api.nvim_win_is_valid(self.footer_win) then
     vim.api.nvim_win_close(self.footer_win, true)
   end
-  AvailableKeymapsList._reset(self)
+  InfoOverlay._reset(self)
 end
 
-function AvailableKeymapsList:_attach_event_handlers()
+function InfoOverlay:_attach_event_handlers()
   local buf = self.buf
 
   -- Close on "q" keypress.
@@ -193,12 +204,12 @@ function AvailableKeymapsList:_attach_event_handlers()
   })
 end
 
-local _overlay = nil ---@type hopper.AvailableKeymapsList | nil
+local _overlay = nil ---@type hopper.InfoOverlay | nil
 
----@return hopper.AvailableKeymapsList
+---@return hopper.InfoOverlay
 function M.overlay()
   if _overlay == nil then
-    _overlay = AvailableKeymapsList._new()
+    _overlay = InfoOverlay._new()
   end
   return _overlay
 end

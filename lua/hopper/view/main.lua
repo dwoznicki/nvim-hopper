@@ -12,7 +12,7 @@ local M = {}
 ---@alias hopper.KeymapFileNode hopper.KeymapFileTree | hopper.FileMapping
 
 ---@class hopper.MainFloat
----@field project string
+---@field project hopper.Project | nil
 ---@field files hopper.FileMapping[]
 ---@field keymap_file_tree hopper.KeymapFileTree
 ---@field filtered_files hopper.FileMapping[]
@@ -36,7 +36,7 @@ end
 
 ---@param float hopper.MainFloat
 function MainFloat._reset(float)
-  float.project = ""
+  float.project = nil
   float.files = {}
   float.keymap_file_tree = {}
   float.filtered_files = {}
@@ -49,13 +49,13 @@ function MainFloat._reset(float)
 end
 
 ---@class hopper.OpenMainFloatOptions
----@field project string | nil
+---@field project hopper.Project | string | nil
 ---@field prior_buf integer | nil
 
 ---@param opts? hopper.OpenMainFloatOptions
 function MainFloat:open(opts)
   opts = opts or {}
-  self.project = opts.project
+  self.project = require("hopper.projects").current_project(opts.project)
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
 
   local ui = vim.api.nvim_list_uis()[1]
@@ -63,7 +63,7 @@ function MainFloat:open(opts)
   self.win_width = win_width
 
   local datastore = require("hopper.db").datastore()
-  local files = datastore:list_files(self.project)
+  local files = datastore:list_files(self.project.name)
   self:_set_files(files)
 
   local buf = vim.api.nvim_create_buf(false, true)
@@ -192,6 +192,7 @@ function MainFloat:_set_files(files)
         node[key] = {} ---@type hopper.KeymapFileTree
       end
       if i == string.len(file.keymap) then
+        ---@type any Can't handle recursive types like this.
         node[key] = file
       end
       node = node[key]
@@ -269,7 +270,7 @@ function MainFloat:_attach_event_handlers()
         project = self.project,
         prior_buf = self.prior_buf,
       }
-      require("hopper.view.keymap_float").float():open(
+      require("hopper.view.keymap").float():open(
         path,
         {
           project = self.project,

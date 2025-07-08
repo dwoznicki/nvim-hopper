@@ -29,8 +29,8 @@ local function handle_command(opts)
     end
     -- local changed = conn:exec_update("INSERT OR REPLACE INTO projects (path) VALUES (?)", {"/abc"})
     -- vim.print("changed = " .. changed)
-  elseif subcommand == "show_available_keymaps" then
-    require("hopper.actions").show_available_keymaps()
+  elseif subcommand == "toggle_info" then
+    require("hopper.actions").toggle_info()
   else
     print("Unrecognized subcommand: " .. (subcommand or "nil"))
   end
@@ -41,7 +41,7 @@ local function complete_subcommand(_, _, _)
     "open",
     "close",
     "populate_db",
-    "show_available_keymaps",
+    "toggle_info",
   }
 end
 

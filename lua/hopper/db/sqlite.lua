@@ -278,7 +278,13 @@ end
 
 ---@class hopper.SqlDatastore
 ---@field conn hopper.Connection
----@field create_tables_stmt hopper.PreparedStatement | nil
+---@field create_projects_table_stmt hopper.PreparedStatement | nil
+---@field create_file_mappings_table_stmt hopper.PreparedStatement | nil
+---@field create_file_mappings_project_idx_stmt hopper.PreparedStatement | nil
+---@field select_project_by_name_stmt hopper.PreparedStatement | nil
+---@field select_project_by_path_stmt hopper.PreparedStatement | nil
+---@field insert_project_stmt hopper.PreparedStatement | nil
+---@field update_project_stmt hopper.PreparedStatement | nil
 ---@field select_files_stmt hopper.PreparedStatement | nil
 ---@field select_keymaps_stmt hopper.PreparedStatement | nil
 ---@field select_file_id_by_path_stmt hopper.PreparedStatement | nil
@@ -300,8 +306,18 @@ function SqlDatastore.new(path)
 end
 
 function SqlDatastore:init()
-  if self.create_tables_stmt == nil then
-    self.create_tables_stmt = PreparedStatement.new([[
+  if self.create_projects_table_stmt == nil then
+    self.create_projects_table_stmt = PreparedStatement.new([[
+      CREATE TABLE IF NOT EXISTS projects (
+        name TEXT PRIMARY KEY,
+        path TEXT NOT NULL UNIQUE,
+        created INTEGER NOT NULL
+      )
+    ]], self.conn)
+  end
+  self.create_projects_table_stmt:exec_update()
+  if self.create_file_mappings_table_stmt == nil then
+    self.create_file_mappings_table_stmt = PreparedStatement.new([[
       CREATE TABLE IF NOT EXISTS file_mappings (
         id INTEGER PRIMARY KEY,
         project TEXT NOT NULL,
@@ -310,14 +326,86 @@ function SqlDatastore:init()
         created INTEGER NOT NULL,
         UNIQUE (project, path),
         UNIQUE (project, keymap)
-      );
-      CREATE INDEX file_mappings_project_idx ON file_mappings (project);
+      )
     ]], self.conn)
   end
-  self.create_tables_stmt:exec_update()
+  self.create_file_mappings_table_stmt:exec_update()
+  if self.create_file_mappings_project_idx_stmt == nil then
+    self.create_file_mappings_project_idx_stmt = PreparedStatement.new([[
+      CREATE INDEX IF NOT EXISTS file_mappings_project_idx ON file_mappings (project);
+    ]], self.conn)
+  end
+  self.create_file_mappings_project_idx_stmt:exec_update()
 end
 
+---@alias hopper.Project {name: string, path: string}
 ---@alias hopper.FileMapping {id: integer, project: string, path: string, keymap: string}
+
+---@param path string
+---@return hopper.Project | nil
+function SqlDatastore:get_project_by_path(path)
+  if self.select_project_by_path_stmt == nil then
+    self.select_project_by_path_stmt = PreparedStatement.new([[
+      SELECT name, path FROM projects WHERE path = ?
+    ]], self.conn)
+  end
+  local results = self.select_project_by_path_stmt:exec_query({path})
+  if #results < 1 then
+    return nil
+  end
+  return {
+    name = results[1][1],
+    path = results[1][2],
+  }
+end
+
+---@param name string
+---@return hopper.Project | nil
+function SqlDatastore:get_project_by_name(name)
+  if self.select_project_by_name_stmt == nil then
+    self.select_project_by_name_stmt = PreparedStatement.new([[
+      SELECT name, path FROM projects WHERE name = ?
+    ]], self.conn)
+  end
+  local results = self.select_project_by_name_stmt:exec_query({name})
+  if #results < 1 then
+    return nil
+  end
+  return {
+    name = results[1][1],
+    path = results[1][2],
+  }
+end
+
+---@param name string
+---@param path string
+function SqlDatastore:set_project(name, path)
+  if self.select_project_by_name_stmt == nil then
+    self.select_project_by_name_stmt = PreparedStatement.new([[
+      SELECT name, path FROM projects WHERE name = ?
+    ]], self.conn)
+  end
+  local results = self.select_project_by_name_stmt:exec_query({name})
+  if #results < 1 then
+    if self.insert_project_stmt == nil then
+      self.insert_project_stmt = PreparedStatement.new([[
+        INSERT INTO projects (name, path, created) VALUES (?, ?, unixepoch())
+      ]], self.conn)
+    end
+    self.insert_project_stmt:exec_update({name, path})
+  else
+    local existing_path = results[1][2]
+    if path == existing_path then
+      return
+    end
+    if self.update_project_stmt == nil then
+      self.update_project_stmt = PreparedStatement.new([[
+        UPDATE projects SET path = ? WHERE name = ?
+      ]], self.conn)
+    end
+    self.update_project_stmt:exec_update({path, name})
+  end
+end
 
 ---@param project string
 ---@return hopper.FileMapping[]

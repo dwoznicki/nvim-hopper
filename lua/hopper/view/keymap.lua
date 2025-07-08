@@ -11,7 +11,7 @@ local loop = vim.uv or vim.loop
 local M = {}
 
 ---@class hopper.KeymapFloatingWindow
----@field project string
+---@field project hopper.Project | nil
 ---@field path string
 ---@field keymap string
 ---@field buf integer
@@ -33,7 +33,7 @@ end
 
 ---@param float hopper.KeymapFloatingWindow
 function KeymapFloatingWindow._reset(float)
-  float.project = ""
+  float.project = nil
   float.path = ""
   float.keymap = ""
   float.buf = -1
@@ -44,14 +44,14 @@ function KeymapFloatingWindow._reset(float)
 end
 
 ---@class hopper.OpenNewKeymapFloatOptions
----@field project string | nil
+---@field project hopper.Project | string | nil
 ---@field go_back function | nil
 
 ---@param path string
 ---@param opts? hopper.OpenNewKeymapFloatOptions
 function KeymapFloatingWindow:open(path, opts)
   opts = opts or {}
-  self.project = opts.project
+  self.project = require("hopper.projects").current_project(opts.project)
   self.go_back_callback = opts.go_back
 
   local ui = vim.api.nvim_list_uis()[1]
@@ -61,7 +61,7 @@ function KeymapFloatingWindow:open(path, opts)
   self.path = quickfile.truncate_path(path, win_width)
 
   local datastore = require("hopper.db").datastore()
-  local existing_file = datastore:get_file_by_path(self.project, path)
+  local existing_file = datastore:get_file_by_path(self.project.name, path)
   local existing_keymap = nil ---@type string | nil
   if existing_file ~= nil then
     existing_keymap = existing_file.keymap
@@ -184,7 +184,7 @@ function KeymapFloatingWindow:confirm()
     return
   end
   local datastore = require("hopper.db").datastore()
-  datastore:set_file(self.project, self.path, self.keymap)
+  datastore:set_file(self.project.name, self.path, self.keymap)
   self:close()
 end
 
@@ -194,7 +194,7 @@ function KeymapFloatingWindow:suggest_keymap()
     return
   end
   local datastore = require("hopper.db").datastore()
-  local assigned_keymaps = utils.set(datastore:list_keymaps(self.project))
+  local assigned_keymaps = utils.set(datastore:list_keymaps(self.project.name))
   local allowed_keys = utils.set(require("hopper.options").options().files.keyset)
   local suggested_keymap = quickfile.keymap_for_path(self.path, 4, allowed_keys, assigned_keymaps)
   vim.api.nvim_buf_set_lines(self.buf, 0, 1, false, {suggested_keymap})
@@ -267,7 +267,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
       local float = self
       loop.new_timer():start(0, 0, function()
         local datastore = require("hopper.db").datastore()
-        local mapping = datastore:get_file_by_keymap(float.project, float.keymap)
+        local mapping = datastore:get_file_by_keymap(float.project.name, float.keymap)
         vim.schedule(function()
           if mapping ~= nil and mapping.path == float.path then
             mapping = nil
