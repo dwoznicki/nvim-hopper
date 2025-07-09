@@ -1,5 +1,6 @@
 local utils = require("hopper.utils")
 local quickfile = require("hopper.quickfile")
+local projects = require("hopper.projects")
 
 local ns_id = vim.api.nvim_create_namespace("hopper.MainFloat")
 local footer_ns_id = vim.api.nvim_create_namespace("hopper.MainFloatFooter")
@@ -55,7 +56,11 @@ end
 ---@param opts? hopper.OpenMainFloatOptions
 function MainFloat:open(opts)
   opts = opts or {}
-  self.project = require("hopper.projects").current_project(opts.project)
+  if opts.project then
+    self.project = projects.resolve_project(opts.project)
+  else
+    self.project = projects.current_project()
+  end
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
 
   local ui = vim.api.nvim_list_uis()[1]

@@ -34,12 +34,13 @@ local ROOT_MARKERS = {
 
 local _curr_project = nil ---@type hopper.Project | nil
 
+---@param base_path string
 ---@return hopper.Project[] possible_projects
-function M.list_projects_from_cwd()
+function M.list_projects_from_path(base_path)
   local datastore = require("hopper.db").datastore()
   local possible_projects = {} ---@type hopper.Project[]
-  local paths = {loop.cwd()}
-  for dir in vim.fs.parents(loop.cwd()) do
+  local paths = {base_path}
+  for dir in vim.fs.parents(base_path) do
     table.insert(paths, dir)
   end
   for _, path in ipairs(paths) do
@@ -51,8 +52,11 @@ function M.list_projects_from_cwd()
       end
     end
     if is_root then
-      local name = datastore:get_project_by_path(path)
-      if name ~= nil then
+      local project = datastore:get_project_by_path(path)
+      local name ---@type string
+      if project ~= nil then
+        name = project.name
+      else
         name = vim.fs.basename(path)
       end
       table.insert(possible_projects, {
@@ -65,7 +69,7 @@ function M.list_projects_from_cwd()
   return possible_projects
 end
 
----@param project string | hopper.Project
+---@param project hopper.Project | string
 ---@return hopper.Project
 function M.resolve_project(project)
   if type(project) == "table" then
@@ -98,15 +102,17 @@ function M.set_current_project(project)
   _curr_project = project
 end
 
----@param forced_current_project string | hopper.Project | nil
 ---@return hopper.Project
-function M.current_project(forced_current_project)
-  if forced_current_project ~= nil then
-    return M.resolve_project(forced_current_project)
-  end
+function M.current_project()
   if _curr_project == nil then
-    local projects = M.list_projects_from_cwd()
-    _curr_project = projects[#projects]
+    local base_path = vim.api.nvim_buf_get_name(0)
+    if not base_path then
+      base_path = loop.cwd()
+    end
+    local projects = M.list_projects_from_path(base_path)
+    _curr_project = projects[1]
+    local datastore = require("hopper.db").datastore()
+    datastore:set_project(_curr_project.name, _curr_project.path)
   end
   return _curr_project
 end

@@ -1,4 +1,5 @@
 local utils = require("hopper.utils")
+local projects = require("hopper.projects")
 
 local footer_ns_id = vim.api.nvim_create_namespace("hopper.AvailableKeymapsFooter")
 local num_chars = 2
@@ -40,7 +41,11 @@ end
 ---@param opts? hopper.OpenInfoOverlayOptions
 function InfoOverlay:open(opts)
   opts = opts or {}
-  self.project = require("hopper.projects").current_project(opts.project)
+  if opts.project then
+    self.project = projects.resolve_project(opts.project)
+  else
+    self.project = projects.current_project()
+  end
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})

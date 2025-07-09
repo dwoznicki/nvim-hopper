@@ -1,5 +1,6 @@
 local utils = require("hopper.utils")
 local quickfile = require("hopper.quickfile")
+local projects = require("hopper.projects")
 
 ---@alias hopper.HighlightLocation {name: string, row: integer, col_start: integer, col_end: integer}
 
@@ -51,7 +52,11 @@ end
 ---@param opts? hopper.OpenNewKeymapFloatOptions
 function KeymapFloatingWindow:open(path, opts)
   opts = opts or {}
-  self.project = require("hopper.projects").current_project(opts.project)
+  if opts.project then
+    self.project = projects.resolve_project(opts.project)
+  else
+    self.project = projects.current_project()
+  end
   self.go_back_callback = opts.go_back
 
   local ui = vim.api.nvim_list_uis()[1]
