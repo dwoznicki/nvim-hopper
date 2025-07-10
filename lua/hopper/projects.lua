@@ -117,4 +117,15 @@ function M.current_project()
   return _curr_project
 end
 
+---@param project_path string
+---@param file_path string
+---@return string path_from_project_root
+function M.path_from_project_root(project_path, file_path)
+  if not vim.startswith(file_path, project_path) then
+    error(string.format("File %s is not part of the current project %s.", file_path, project_path))
+  end
+  return string.sub(file_path, string.len(project_path) + 2)
+end
+
+
 return M

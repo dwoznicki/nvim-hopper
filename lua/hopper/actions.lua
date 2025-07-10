@@ -1,12 +1,16 @@
+local projects = require("hopper.projects")
+
 local M = {}
 
-function M.choose_keymap()
-  local path = require("hopper.filepath").get_path_from_project_root(vim.api.nvim_buf_get_name(0))
+function M.new_keymap()
+  local project = projects.current_project()
+  local file_path = vim.api.nvim_buf_get_name(0)
+  local path = projects.path_from_project_root(project.path, file_path)
   local float = require("hopper.view.keymap").float()
   float:open(path)
 end
 
-function M.open_file_hopper()
+function M.toggle_view()
   local float = require("hopper.view.main").float()
   float:open()
 end

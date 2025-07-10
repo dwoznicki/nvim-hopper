@@ -270,7 +270,7 @@ function MainFloat:_attach_event_handlers()
     "n",
     "n",
     function()
-      local path = require("hopper.filepath").get_path_from_project_root(vim.api.nvim_buf_get_name(self.prior_buf))
+      local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
       local options = {
         project = self.project,
         prior_buf = self.prior_buf,

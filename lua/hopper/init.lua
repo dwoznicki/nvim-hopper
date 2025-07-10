@@ -25,7 +25,8 @@ function M.setup(options)
   -- -- require("bufhopper.integrations").setup()
 end
 
-M.choose_keymap = require("hopper.actions").choose_keymap
-M.open_file_hopper = require("hopper.actions").open_file_hopper
+M.new_keymap = require("hopper.actions").new_keymap
+M.toggle_view = require("hopper.actions").toggle_view
+M.toggle_info = require("hopper.actions").toggle_info
 
 return M
