@@ -62,18 +62,43 @@ function M.sorted(tbl)
 end
 
 ---@param buf integer
----@param num_chars integer | nil
+---@param num_chars integer
 ---@return string
--- Clamp buffer value to first line. If `num_chars` is passed in, additionally clamp line value to
--- given number of characters.
-function M.clamp_buffer_value(buf, num_chars)
-  local value = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {value})
+-- Clamp buffer value to given number of characters and return result.
+-- Only one line is supported.
+function M.clamp_buffer_value_chars(buf, num_chars)
+  local value = vim.api.nvim_buf_get_lines(buf, 0, -1, false)[1] or ""
   if num_chars ~= nil and string.len(value) > num_chars then
     value = value:sub(1, num_chars)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {value})
   end
   return value
 end
+
+---@class hopper.ClampBufferValueLinesOpts
+---@field exact? boolean If true, enforce exactly this number of lines, adding blanks if necessary.
+
+---@param buf integer
+---@param num_lines integer
+---@param opts? hopper.ClampBufferValueLinesOpts
+---@return string[]
+-- Clamp buffer value to given number of lines and return result.
+function M.clamp_buffer_value_lines(buf, num_lines, opts)
+  opts = opts or {}
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, num_lines, false)
+  if opts.exact then
+    while #lines < num_lines do
+      table.insert(lines, "")
+      -- Call it after a while as a failsafe. If we get up to 1000 lines, something has gone wrong
+      -- with this while loop.
+      if #lines > 1000 then
+        break
+      end
+    end
+  end
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  return lines
+end
+
 
 return M

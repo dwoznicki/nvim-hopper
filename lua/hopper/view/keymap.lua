@@ -266,7 +266,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
     callback = function()
       -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
-      local value = utils.clamp_buffer_value(buf, num_chars)
+      local value = utils.clamp_buffer_value_chars(buf, num_chars)
       self.keymap = value
       self:draw()
       local float = self

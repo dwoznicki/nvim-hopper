@@ -226,7 +226,7 @@ function MainFloat:_attach_event_handlers()
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged", "TextChangedP"}, {
     buffer = buf,
     callback = function()
-      local value = utils.clamp_buffer_value(buf, num_chars)
+      local value = utils.clamp_buffer_value_chars(buf, num_chars)
       -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
       vim.print(value)

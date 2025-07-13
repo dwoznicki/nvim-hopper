@@ -4,7 +4,7 @@ local utils = require("hopper.utils")
 local loop = vim.uv or vim.loop
 
 ---@class hopper.NewProjectFormValidationError
----@field code "empty_field" | "no_such_directory" | "project_exists"
+---@field code "name_field_empty" | "project_field_empty" | "no_such_directory" | "project_exists"
 ---@field message string
 
 local M = {}
@@ -12,16 +12,19 @@ local M = {}
 ---@class hopper.NewProjectForm
 ---@field name string
 ---@field path string
----@field step integer
 ---@field buf integer
 ---@field win integer
+---@field footer_buf integer
+---@field footer_win integer
 ---@field validation hopper.NewProjectFormValidationError | nil
 local NewProjectForm = {}
 NewProjectForm.__index = NewProjectForm
 M.NewProjectForm = NewProjectForm
 
-NewProjectForm.default_win_height = 3
+NewProjectForm.default_win_height = 4
+NewProjectForm.default_footer_win_height = 2
 NewProjectForm.ns = vim.api.nvim_create_namespace("hopper.NewProjectForm")
+NewProjectForm.footer_ns = vim.api.nvim_create_namespace("hopper.NewProjectFormFooter")
 
 ---@return hopper.NewProjectForm
 function NewProjectForm._new()
@@ -35,21 +38,20 @@ end
 function NewProjectForm._reset(form)
   form.name = ""
   form.path = ""
-  form.step = -1
   form.buf = -1
   form.win = -1
+  form.footer_buf = -1
+  form.footer_win = -1
   form.validation = nil
 end
 
 function NewProjectForm:open()
-  self.step = 1
-
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, _ = utils.get_win_dimensions()
   self.win_width = win_width
 
   local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_set_option_value("buftype", "prompt", {buf = buf})
+  vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
   vim.api.nvim_set_option_value("buflisted", false, {buf = buf})
@@ -67,8 +69,6 @@ function NewProjectForm:open()
     title_pos = "center",
     border = "rounded",
   }
-  -- Don't show the prompt text.
-  vim.fn.prompt_setprompt(buf, "")
   vim.api.nvim_create_autocmd("BufEnter", {
     buffer = buf,
     callback = function()
@@ -76,57 +76,158 @@ function NewProjectForm:open()
     end,
   })
   local win = vim.api.nvim_open_win(buf, true, win_config)
+  -- Create two empty lines in buffer.
+  utils.clamp_buffer_value_lines(buf, 2, {exact = true})
+  local statuscolumn_vimscript = "%#hopper.hl.ProjectText#%{v:lnum==1?'Name ':v:lnum==2?'Path ':'     '}%*"
+  vim.api.nvim_set_option_value("statuscolumn", statuscolumn_vimscript, {win = win})
+
+  local footer_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_option_value("buftype", "nofile", {buf = footer_buf})
+  vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = footer_buf})
+  vim.api.nvim_set_option_value("swapfile", false, {buf = footer_buf})
+  vim.api.nvim_buf_set_lines(footer_buf, 0, -1, false, {""})
+  ---@type vim.api.keyset.win_config
+  local footer_win_config = {
+    style = "minimal",
+    relative = "editor",
+    width = win_config.width,
+    height = 2,
+    row = win_config.row + win_config.height - 1,
+    col = win_config.col + 1,
+    focusable = false,
+    border = "none",
+    zindex = 51, -- Just enough to site on top of the main window.
+  }
+  local footer_win = vim.api.nvim_open_win(footer_buf, false, footer_win_config)
+
   self.buf = buf
   self.win = win
+  self.footer_buf = footer_buf
+  self.footer_win = footer_win
 
   self:_attach_event_handlers()
 
-  self:draw()
+  self:draw_footer()
 end
 
-function NewProjectForm:draw()
-  vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1)
+-- function NewProjectForm:draw()
+--   vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1)
+--
+--   local lines = {} ---@type string[][][]
+--   local error_line = nil ---@type string[][] | nil
+--   local next_win_height ---@type integer
+--   if self.validation ~= nil then
+--     error_line = {
+--       {self.validation.message, "Error"},
+--     }
+--     next_win_height = 2
+--   else
+--     next_win_height = 1
+--   end
+--   if vim.api.nvim_win_get_height(self.footer_win) ~= next_win_height then
+--     vim.api.nvim_win_set_height(self.footer_win, next_win_height)
+--   end
+--   if error_line ~= nil then
+--     table.insert(lines, error_line)
+--   end
+--
+--   -- vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
+--   --   virt_lines = lines,
+--   --   virt_lines_above = false,
+--   --   virt_lines_leftcol = false,
+--   -- })
+--
+--   -- local label = ""
+--   -- if self.step == 1 then
+--   --   -- vim.fn.prompt_setprompt(self.buf, "Name ")
+--   --   label = "Project name"
+--   -- elseif self.step == 2 then
+--   --   -- vim.fn.prompt_setprompt(self.buf, "Path ")
+--   --   label = "Project path"
+--   -- end
+--
+--   -- vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
+--   --   virt_text = {{label, "Comment"}, {" "}},
+--   --   virt_text_pos = "right_align",
+--   -- })
+--
+--   -- local lines = {} ---@type string[][][]
+--   --
+--   -- local state_line = {} ---@type string[][]
+--   -- table.insert(state_line, {
+--   --   string.len(self.name) > 0 and self.name or "Project name",
+--   --   self.step == 1 and "hopper.hl.SelectedText" or "hopper.hl.SecondaryText",
+--   -- })
+--   -- table.insert(state_line, {" - ", "hopper.hl.SecondaryText"})
+--   -- table.insert(state_line, {
+--   --   string.len(self.path) > 0 and self.path or "Project path",
+--   --   self.step == 2 and "hopper.hl.SelectedText" or "hopper.hl.SecondaryText",
+--   -- })
+--   -- table.insert(lines, state_line)
+--   --
+--   -- local error_line = nil ---@type string[][] | nil
+--   -- local next_win_height ---@type integer
+--   -- if self.validation ~= nil then
+--   --   next_win_height = self.default_win_height + 1
+--   --   error_line = {
+--   --     {self.validation.message, "Error"},
+--   --   }
+--   -- else
+--   --   next_win_height = self.default_win_height
+--   -- end
+--   -- if vim.api.nvim_win_get_height(self.win) ~= next_win_height then
+--   --   vim.api.nvim_win_set_height(self.win, next_win_height)
+--   -- end
+--   -- if error_line ~= nil then
+--   --   table.insert(lines, error_line)
+--   -- end
+--   --
+--   -- local help_line = {{"  "}} ---@type string[][]
+--   -- local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
+--   -- if has_values then
+--   --   table.insert(help_line, {"󰌑 ", "Function"})
+--   --   table.insert(help_line, {" Confirm"})
+--   -- else
+--   --   table.insert(help_line, {"󰌑  Confirm", "Comment"})
+--   -- end
+--   -- table.insert(help_line, {"  "})
+--   -- local curr_mode = vim.api.nvim_get_mode().mode
+--   -- if curr_mode == "n" then
+--   --   table.insert(help_line, {"󰌒 ", "String"})
+--   --   table.insert(help_line, {" Next field"})
+--   -- else
+--   --   table.insert(help_line, {"󰌒  Next field", "Comment"})
+--   -- end
+--   -- table.insert(lines, help_line)
+--   --
+--   -- vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
+--   --   virt_lines = lines,
+--   --   virt_lines_above = false,
+--   --   virt_lines_leftcol = false,
+--   -- })
+-- end
 
-  local label = ""
-  if self.step == 1 then
-    -- vim.fn.prompt_setprompt(self.buf, "Name ")
-    label = "Project name"
-  elseif self.step == 2 then
-    -- vim.fn.prompt_setprompt(self.buf, "Path ")
-    label = "Project path"
-  end
-
-  vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
-    virt_text = {{label, "Comment"}, {" "}},
-    virt_text_pos = "right_align",
-  })
+function NewProjectForm:draw_footer()
+  vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
 
   local lines = {} ---@type string[][][]
 
-  local state_line = {} ---@type string[][]
-  table.insert(state_line, {
-    string.len(self.name) > 0 and self.name or "Project name",
-    self.step == 1 and "hopper.hl.SelectedText" or "hopper.hl.SecondaryText",
-  })
-  table.insert(state_line, {" - ", "hopper.hl.SecondaryText"})
-  table.insert(state_line, {
-    string.len(self.path) > 0 and self.path or "Project path",
-    self.step == 2 and "hopper.hl.SelectedText" or "hopper.hl.SecondaryText",
-  })
-  table.insert(lines, state_line)
-
   local error_line = nil ---@type string[][] | nil
   local next_win_height ---@type integer
+  local next_footer_win_height ---@type integer
   if self.validation ~= nil then
-    next_win_height = self.default_win_height + 1
     error_line = {
       {self.validation.message, "Error"},
     }
+    next_win_height = self.default_win_height + 1
+    next_footer_win_height = self.default_footer_win_height + 1
   else
     next_win_height = self.default_win_height
+    next_footer_win_height = self.default_footer_win_height
   end
   if vim.api.nvim_win_get_height(self.win) ~= next_win_height then
     vim.api.nvim_win_set_height(self.win, next_win_height)
+    vim.api.nvim_win_set_height(self.footer_win, next_footer_win_height)
   end
   if error_line ~= nil then
     table.insert(lines, error_line)
@@ -140,17 +241,9 @@ function NewProjectForm:draw()
   else
     table.insert(help_line, {"󰌑  Confirm", "Comment"})
   end
-  table.insert(help_line, {"  "})
-  local curr_mode = vim.api.nvim_get_mode().mode
-  if curr_mode == "n" then
-    table.insert(help_line, {"󰌒 ", "String"})
-    table.insert(help_line, {" Next field"})
-  else
-    table.insert(help_line, {"󰌒  Next field", "Comment"})
-  end
   table.insert(lines, help_line)
 
-  vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
+  vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_lines = lines,
     virt_lines_above = false,
     virt_lines_leftcol = false,
@@ -160,7 +253,7 @@ end
 function NewProjectForm:confirm()
   self:validate()
   if self.validation ~= nil then
-    self:draw()
+    self:draw_footer()
     return
   end
   local datastore = require("hopper.db").datastore()
@@ -169,10 +262,17 @@ function NewProjectForm:confirm()
 end
 
 function NewProjectForm:validate()
-  if string.len(self.name) < 1 or string.len(self.path) < 1 then
+  if string.len(self.name) < 1 then
     self.validation = {
-      code = "empty_field",
-      message = "Project name and path cannot be empty.",
+      code = "name_field_empty",
+      message = "Project name cannot be empty.",
+    }
+    return
+  end
+  if string.len(self.path) < 1 then
+    self.validation = {
+      code = "project_field_empty",
+      message = "Project path cannot be empty.",
     }
     return
   end
@@ -208,6 +308,9 @@ function NewProjectForm:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
   end
+  if vim.api.nvim_win_is_valid(self.footer_win) then
+    vim.api.nvim_win_close(self.footer_win, true)
+  end
   NewProjectForm._reset(self)
 end
 
@@ -216,17 +319,13 @@ function NewProjectForm:_attach_event_handlers()
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged", "TextChangedP"}, {
     buffer = buf,
     callback = function()
-      local value = utils.clamp_buffer_value(buf)
-      -- Clear the `modified` flag for prompt so we can close without saving.
-      vim.bo[buf].modified = false
-      if self.step == 1 then
-        self.name = value
-      elseif self.step == 2 then
-        self.path = value
-      end
+      local lines = utils.clamp_buffer_value_lines(buf, 2, {exact = true})
+      self.name = lines[1]
+      self.path = lines[2]
       local form = self
       vim.schedule(function()
-        form:draw()
+        form.validation = nil
+        form:draw_footer()
       end)
     end,
   })
@@ -234,7 +333,7 @@ function NewProjectForm:_attach_event_handlers()
   vim.api.nvim_create_autocmd("ModeChanged", {
     buffer = buf,
     callback = function()
-      self:draw()
+      self:draw_footer()
     end,
   })
 
@@ -247,21 +346,22 @@ function NewProjectForm:_attach_event_handlers()
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
   -- Next field on tab keypress.
-  vim.keymap.set(
-    "n",
-    "<tab>",
-    function()
-      if self.step == 1 then
-        self.step = 2
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, {self.path})
-      else
-        self.step = 1
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, {self.name})
-      end
-      self:draw()
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
+  -- vim.keymap.set(
+  --   "n",
+  --   "<tab>",
+  --   function()
+  --     if self.step == 1 then
+  --       self.step = 2
+  --       vim.api.nvim_buf_set_lines(buf, 0, -1, false, {self.path})
+  --     else
+  --       self.step = 1
+  --       vim.api.nvim_buf_set_lines(buf, 0, -1, false, {self.name})
+  --     end
+  --     self:draw()
+  --   end,
+  --   {noremap = true, silent = true, nowait = true, buffer = buf}
+  -- )
+
   -- Close on q keypress.
   vim.keymap.set(
     "n",
