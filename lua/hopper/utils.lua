@@ -62,13 +62,16 @@ function M.sorted(tbl)
 end
 
 ---@param buf integer
----@param num_chars integer
+---@param num_chars integer | nil
 ---@return string
+-- Clamp buffer value to first line. If `num_chars` is passed in, additionally clamp line value to
+-- given number of characters.
 function M.clamp_buffer_value(buf, num_chars)
   local value = vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] or ""
-  if string.len(value) > num_chars then
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, {value})
+  if num_chars ~= nil and string.len(value) > num_chars then
     value = value:sub(1, num_chars)
-    vim.api.nvim_buf_set_lines(buf, 0, 1, false, {value})
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {value})
   end
   return value
 end

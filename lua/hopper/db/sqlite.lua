@@ -278,11 +278,12 @@ end
 
 ---@class hopper.SqlDatastore
 ---@field conn hopper.Connection
+---@field select_projects_stmt hopper.PreparedStatement | nil
+---@field select_project_by_name_stmt hopper.PreparedStatement | nil
+---@field select_project_by_path_stmt hopper.PreparedStatement | nil
 ---@field create_projects_table_stmt hopper.PreparedStatement | nil
 ---@field create_file_mappings_table_stmt hopper.PreparedStatement | nil
 ---@field create_file_mappings_project_idx_stmt hopper.PreparedStatement | nil
----@field select_project_by_name_stmt hopper.PreparedStatement | nil
----@field select_project_by_path_stmt hopper.PreparedStatement | nil
 ---@field insert_project_stmt hopper.PreparedStatement | nil
 ---@field update_project_stmt hopper.PreparedStatement | nil
 ---@field select_files_stmt hopper.PreparedStatement | nil
@@ -340,6 +341,24 @@ end
 
 ---@alias hopper.Project {name: string, path: string}
 ---@alias hopper.FileMapping {id: integer, project: string, path: string, keymap: string}
+
+---@return hopper.Project[]
+function SqlDatastore:list_projects()
+  if self.select_projects_stmt == nil then
+    self.select_projects_stmt = PreparedStatement.new([[
+      SELECT name, path FROM projects
+    ]], self.conn)
+  end
+  local results = self.select_projects_stmt:exec_query()
+  local projects = {} ---@type hopper.Project[]
+  for _, result in ipairs(results) do
+    table.insert(projects, {
+      name = result[1],
+      path = result[2],
+    })
+  end
+  return projects
+end
 
 ---@param path string
 ---@return hopper.Project | nil

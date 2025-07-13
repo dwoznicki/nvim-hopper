@@ -166,13 +166,25 @@ function MainFloat:draw_footer()
   local help_line = {{" "}} ---@type string[][]
   local curr_mode = vim.api.nvim_get_mode().mode
   if curr_mode == "n" then
-    table.insert(help_line, {"n", "Function"})
+    table.insert(help_line, {"K", "Function"})
     table.insert(help_line, {" New keymap"})
+    table.insert(help_line, {"  "})
+    table.insert(help_line, {"P", "Function"})
+    table.insert(help_line, {" Project menu"})
   else
-    table.insert(help_line, {"n New keymap", "Comment"})
+    table.insert(help_line, {"K New keymap", "Comment"})
+    table.insert(help_line, {"  "})
+    table.insert(help_line, {"P Project menu", "Comment"})
   end
   vim.api.nvim_buf_set_extmark(self.footer_buf, footer_ns_id, 0, 0, {
     virt_text = help_line,
+    virt_text_pos = "overlay",
+  })
+
+  local project_line = {{" " .. self.project.name .. " ", "hopper.hl.ProjectTag"}, {" "}}
+  vim.api.nvim_buf_set_extmark(self.footer_buf, footer_ns_id, 0, 0, {
+    virt_text = project_line,
+    virt_text_pos = "right_align",
   })
 end
 
@@ -211,12 +223,12 @@ end
 function MainFloat:_attach_event_handlers()
   local buf = self.buf
 
-  vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged"}, {
+  vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged", "TextChangedP"}, {
     buffer = buf,
     callback = function()
-      -- Clear the `modified` flag for prompt.
-      vim.bo[buf].modified = false
       local value = utils.clamp_buffer_value(buf, num_chars)
+      -- Clear the `modified` flag for prompt so we can close without saving.
+      vim.bo[buf].modified = false
       vim.print(value)
       if string.len(value) < 1 then
         self.filtered_files = self.files
@@ -265,10 +277,10 @@ function MainFloat:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
-  -- Open new keymap view on n keypress.
+  -- Open new keymap view on K keypress.
   vim.keymap.set(
     "n",
-    "n",
+    "K",
     function()
       local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
       local options = {
@@ -284,6 +296,15 @@ function MainFloat:_attach_event_handlers()
           end,
         }
       )
+    end,
+    {noremap = true, silent = true, nowait = true, buffer = buf}
+  )
+  -- Open project menu on P keypress.
+  vim.keymap.set(
+    "n",
+    "P",
+    function()
+      require("hopper.view.project_ui").open_project_menu()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )

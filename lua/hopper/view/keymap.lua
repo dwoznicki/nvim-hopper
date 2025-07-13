@@ -116,7 +116,7 @@ function KeymapFloatingWindow:open(path, opts)
 end
 
 function KeymapFloatingWindow:draw()
-  vim.api.nvim_buf_clear_namespace(self.buf, ns_id, 0, -1) -- clear highlights
+  vim.api.nvim_buf_clear_namespace(self.buf, ns_id, 0, -1)
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
   local used = string.len(value)
@@ -264,7 +264,7 @@ function KeymapFloatingWindow:_attach_event_handlers()
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged"}, {
     buffer = buf,
     callback = function()
-      -- Clear the `modified` flag for prompt.
+      -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
       local value = utils.clamp_buffer_value(buf, num_chars)
       self.keymap = value
