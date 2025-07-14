@@ -3,8 +3,10 @@ local utils = require("hopper.utils")
 
 local loop = vim.uv or vim.loop
 
----@class hopper.NewProjectFormValidationError
----@field code "name_field_empty" | "project_field_empty" | "no_such_directory" | "project_exists"
+---@alias hopper.NewProjectFormValidationCode "name_field_empty" | "project_field_empty" | "no_such_directory" | "project_name_exists" | "project_path_exists"
+
+---@class hopper.NewProjectFormValidation
+---@field code hopper.NewProjectFormValidationCode
 ---@field message string
 
 local M = {}
@@ -16,7 +18,7 @@ local M = {}
 ---@field win integer
 ---@field footer_buf integer
 ---@field footer_win integer
----@field validation hopper.NewProjectFormValidationError | nil
+---@field validation hopper.NewProjectFormValidation | nil
 local NewProjectForm = {}
 NewProjectForm.__index = NewProjectForm
 M.NewProjectForm = NewProjectForm
@@ -110,103 +112,6 @@ function NewProjectForm:open()
   self:draw_footer()
 end
 
--- function NewProjectForm:draw()
---   vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1)
---
---   local lines = {} ---@type string[][][]
---   local error_line = nil ---@type string[][] | nil
---   local next_win_height ---@type integer
---   if self.validation ~= nil then
---     error_line = {
---       {self.validation.message, "Error"},
---     }
---     next_win_height = 2
---   else
---     next_win_height = 1
---   end
---   if vim.api.nvim_win_get_height(self.footer_win) ~= next_win_height then
---     vim.api.nvim_win_set_height(self.footer_win, next_win_height)
---   end
---   if error_line ~= nil then
---     table.insert(lines, error_line)
---   end
---
---   -- vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
---   --   virt_lines = lines,
---   --   virt_lines_above = false,
---   --   virt_lines_leftcol = false,
---   -- })
---
---   -- local label = ""
---   -- if self.step == 1 then
---   --   -- vim.fn.prompt_setprompt(self.buf, "Name ")
---   --   label = "Project name"
---   -- elseif self.step == 2 then
---   --   -- vim.fn.prompt_setprompt(self.buf, "Path ")
---   --   label = "Project path"
---   -- end
---
---   -- vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
---   --   virt_text = {{label, "Comment"}, {" "}},
---   --   virt_text_pos = "right_align",
---   -- })
---
---   -- local lines = {} ---@type string[][][]
---   --
---   -- local state_line = {} ---@type string[][]
---   -- table.insert(state_line, {
---   --   string.len(self.name) > 0 and self.name or "Project name",
---   --   self.step == 1 and "hopper.hl.SelectedText" or "hopper.hl.SecondaryText",
---   -- })
---   -- table.insert(state_line, {" - ", "hopper.hl.SecondaryText"})
---   -- table.insert(state_line, {
---   --   string.len(self.path) > 0 and self.path or "Project path",
---   --   self.step == 2 and "hopper.hl.SelectedText" or "hopper.hl.SecondaryText",
---   -- })
---   -- table.insert(lines, state_line)
---   --
---   -- local error_line = nil ---@type string[][] | nil
---   -- local next_win_height ---@type integer
---   -- if self.validation ~= nil then
---   --   next_win_height = self.default_win_height + 1
---   --   error_line = {
---   --     {self.validation.message, "Error"},
---   --   }
---   -- else
---   --   next_win_height = self.default_win_height
---   -- end
---   -- if vim.api.nvim_win_get_height(self.win) ~= next_win_height then
---   --   vim.api.nvim_win_set_height(self.win, next_win_height)
---   -- end
---   -- if error_line ~= nil then
---   --   table.insert(lines, error_line)
---   -- end
---   --
---   -- local help_line = {{"  "}} ---@type string[][]
---   -- local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
---   -- if has_values then
---   --   table.insert(help_line, {"󰌑 ", "Function"})
---   --   table.insert(help_line, {" Confirm"})
---   -- else
---   --   table.insert(help_line, {"󰌑  Confirm", "Comment"})
---   -- end
---   -- table.insert(help_line, {"  "})
---   -- local curr_mode = vim.api.nvim_get_mode().mode
---   -- if curr_mode == "n" then
---   --   table.insert(help_line, {"󰌒 ", "String"})
---   --   table.insert(help_line, {" Next field"})
---   -- else
---   --   table.insert(help_line, {"󰌒  Next field", "Comment"})
---   -- end
---   -- table.insert(lines, help_line)
---   --
---   -- vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
---   --   virt_lines = lines,
---   --   virt_lines_above = false,
---   --   virt_lines_leftcol = false,
---   -- })
--- end
-
 function NewProjectForm:draw_footer()
   vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
 
@@ -216,8 +121,14 @@ function NewProjectForm:draw_footer()
   local next_win_height ---@type integer
   local next_footer_win_height ---@type integer
   if self.validation ~= nil then
+    local hl ---@type string
+    if self.validation.code == "no_such_directory" or self.validation.code == "project_name_exists" then
+      hl = "WarningMsg"
+    else
+      hl = "ErrorMsg"
+    end
     error_line = {
-      {self.validation.message, "Error"},
+      {self.validation.message, hl},
     }
     next_win_height = self.default_win_height + 1
     next_footer_win_height = self.default_footer_win_height + 1
@@ -251,8 +162,9 @@ function NewProjectForm:draw_footer()
 end
 
 function NewProjectForm:confirm()
+  local prev_code = self.validation and self.validation.code or nil
   self:validate()
-  if self.validation ~= nil then
+  if self.validation ~= nil and not self.can_validation_be_forced(self.validation.code, prev_code) then
     self:draw_footer()
     return
   end
@@ -280,7 +192,7 @@ function NewProjectForm:validate()
   if not path_stat or path_stat.type ~= "directory" then
     self.validation = {
       code = "no_such_directory",
-      message = string.format("Could not resolve directory \"%s\".", self.path),
+      message = string.format("Could not resolve directory \"%s\". Use it anyway?", self.path),
     }
     return
   end
@@ -288,20 +200,32 @@ function NewProjectForm:validate()
   local project_by_name = datastore:get_project_by_name(self.name)
   if project_by_name ~= nil then
     self.validation = {
-      code = "project_exists",
-      message = string.format("Project with name \"%s\" already exists.", self.name),
+      code = "project_name_exists",
+      message = string.format("Project with name \"%s\" already exists. Update the project path?", self.name),
     }
     return
   end
   local project_by_path = datastore:get_project_by_path(self.path)
   if project_by_path ~= nil then
     self.validation = {
-      code = "project_exists",
+      code = "project_path_exists",
       message = string.format("Project with path \"%s\" already exists.", self.path),
     }
     return
   end
   self.validation = nil
+end
+
+---@param code hopper.NewProjectFormValidationCode
+---@param prev_code hopper.NewProjectFormValidationCode | nil
+---@return boolean
+function NewProjectForm.can_validation_be_forced(code, prev_code)
+  -- Don't allow forcing new validation errors. We can only force when the new validation is the
+  -- same as the previous validation type.
+  if code ~= prev_code then
+    return false
+  end
+  return code == "project_name_exists" or code == "no_such_directory"
 end
 
 function NewProjectForm:close()
@@ -366,9 +290,14 @@ function NewProjectForm:_attach_event_handlers()
   vim.keymap.set(
     "n",
     "q",
-    function()
-      self:close()
-    end,
+    function() self:close() end,
+    {noremap = true, silent = true, nowait = true, buffer = buf}
+  )
+  -- Close on escape keypress.
+  vim.keymap.set(
+    "n",
+    "<esc>",
+    function() self:close() end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
   vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
