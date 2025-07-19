@@ -20,6 +20,8 @@ local M = {}
 ---@field footer_win integer
 ---@field validation hopper.NewProjectFormValidation | nil
 ---@field suggested_project hopper.Project | nil
+---@field on_created fun(form: hopper.NewProjectForm) | nil
+---@field on_cancel fun(form: hopper.NewProjectForm) | nil
 local NewProjectForm = {}
 NewProjectForm.__index = NewProjectForm
 M.NewProjectForm = NewProjectForm
@@ -47,9 +49,20 @@ function NewProjectForm._reset(form)
   form.footer_win = -1
   form.validation = nil
   form.suggested_project = nil
+  form.on_created = nil
+  form.on_cancel = nil
 end
 
-function NewProjectForm:open()
+---@class hopper.NewProjectFormOpenOptions
+---@field on_created? fun(form: hopper.NewProjectForm)
+---@field on_cancel? fun(form: hopper.NewProjectForm)
+
+---@param opts? hopper.NewProjectFormOpenOptions
+function NewProjectForm:open(opts)
+  opts = opts or {}
+  self.on_created = opts.on_created
+  self.on_cancel = opts.on_cancel
+
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, _ = utils.get_win_dimensions()
   self.win_width = win_width
@@ -114,7 +127,7 @@ function NewProjectForm:open()
   self:draw_footer()
 
   loop.new_timer():start(300, 0, function()
-    -- Delay so it "pops in", mimicing expected suggestion UI.
+    -- Delay so it "pops in", mimicing expected suggestion UX.
     self:_suggest_project()
   end)
 end
@@ -184,7 +197,13 @@ function NewProjectForm:confirm()
   end
   local datastore = require("hopper.db").datastore()
   datastore:set_project(self.name, self.path)
-  self:close()
+  vim.schedule(function()
+    if self.on_created ~= nil then
+      self.on_created(self)
+    else
+      self:close()
+    end
+  end)
 end
 
 function NewProjectForm:validate()
@@ -325,18 +344,30 @@ function NewProjectForm:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
   )
-  -- Close on q keypress.
+  -- Cancel on q keypress.
   vim.keymap.set(
     "n",
     "q",
-    function() self:close() end,
+    function()
+      if self.on_cancel ~= nil then
+        self.on_cancel(self)
+      else
+        self:close()
+      end
+    end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
   -- Close on escape keypress.
   vim.keymap.set(
     "n",
     "<esc>",
-    function() self:close() end,
+    function()
+      if self.on_cancel ~= nil then
+        self.on_cancel(self)
+      else
+        self:close()
+      end
+    end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
   vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
@@ -402,26 +433,12 @@ function M.form()
   return _form
 end
 
-function M.open_project_menu()
-  vim.ui.select(
-    {
-      "Create new project",
-      "Change current project",
-    },
-    {
-      prompt = "Select an option",
-    },
-    function(_, idx)
-      if idx == 1 then
-        M.form():open()
-      elseif idx == 2 then
-        M.change_current_project()
-      end
-    end
-  )
-end
+---@class hopper.ChangeCurrentProjectOptions
+---@field on_changed? fun()
 
-function M.change_current_project()
+---@param opts? hopper.ChangeCurrentProjectOptions
+function M.change_current_project(opts)
+  opts = opts or {}
   local added_names = {} ---@type table<string, true>
   local project_items = {} ---@type hopper.Project[]
 
@@ -453,6 +470,38 @@ function M.change_current_project()
     function(choice)
       if choice ~= nil then
         projects.set_current_project(choice)
+        if opts.on_changed ~= nil then
+          opts.on_changed()
+        end
+      end
+    end
+  )
+end
+
+---@class hopper.OpenProjectMenuOptions
+---@field on_new_project_created? fun(form: hopper.NewProjectForm)
+---@field on_current_project_changed? fun()
+
+---@param opts? hopper.OpenProjectMenuOptions
+function M.open_project_menu(opts)
+  opts = opts or {}
+  vim.ui.select(
+    {
+      "Create new project",
+      "Change current project",
+    },
+    {
+      prompt = "Select an option",
+    },
+    function(_, idx)
+      if idx == 1 then
+        M.form():open({
+          on_created = opts.on_new_project_created,
+        })
+      elseif idx == 2 then
+        M.change_current_project({
+          on_changed = opts.on_current_project_changed,
+        })
       end
     end
   )

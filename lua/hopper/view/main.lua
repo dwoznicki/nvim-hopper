@@ -169,12 +169,12 @@ function MainFloat:draw_footer()
     table.insert(help_line, {"K", "Function"})
     table.insert(help_line, {" New keymap"})
     table.insert(help_line, {"  "})
-    table.insert(help_line, {"P", "Function"})
+    table.insert(help_line, {"p", "Function"})
     table.insert(help_line, {" Project menu"})
   else
     table.insert(help_line, {"K New keymap", "Comment"})
     table.insert(help_line, {"  "})
-    table.insert(help_line, {"P Project menu", "Comment"})
+    table.insert(help_line, {"p Project menu", "Comment"})
   end
   vim.api.nvim_buf_set_extmark(self.footer_buf, footer_ns_id, 0, 0, {
     virt_text = help_line,
@@ -302,9 +302,17 @@ function MainFloat:_attach_event_handlers()
   -- Open project menu on P keypress.
   vim.keymap.set(
     "n",
-    "P",
+    "p",
     function()
-      require("hopper.view.project_ui").open_project_menu()
+      require("hopper.view.project_ui").open_project_menu({
+        on_new_project_created = function(form)
+          form:close()
+          self:open({prior_buf = self.prior_buf})
+        end,
+        on_current_project_changed = function()
+          self:open({prior_buf = self.prior_buf})
+        end,
+      })
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
