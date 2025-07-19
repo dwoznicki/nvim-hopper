@@ -19,6 +19,7 @@ local M = {}
 ---@field footer_buf integer
 ---@field footer_win integer
 ---@field validation hopper.NewProjectFormValidation | nil
+---@field suggested_project hopper.Project | nil
 local NewProjectForm = {}
 NewProjectForm.__index = NewProjectForm
 M.NewProjectForm = NewProjectForm
@@ -45,6 +46,7 @@ function NewProjectForm._reset(form)
   form.footer_buf = -1
   form.footer_win = -1
   form.validation = nil
+  form.suggested_project = nil
 end
 
 function NewProjectForm:open()
@@ -110,6 +112,11 @@ function NewProjectForm:open()
   self:_attach_event_handlers()
 
   self:draw_footer()
+
+  loop.new_timer():start(300, 0, function()
+    -- Delay so it "pops in", mimicing expected suggestion UI.
+    self:_suggest_project()
+  end)
 end
 
 function NewProjectForm:draw_footer()
@@ -151,6 +158,13 @@ function NewProjectForm:draw_footer()
     table.insert(help_line, {" Confirm"})
   else
     table.insert(help_line, {"󰌑  Confirm", "Comment"})
+  end
+  table.insert(help_line, {"  "})
+  if self.suggested_project ~= nil then
+    table.insert(help_line, {"󰌒 ", "String"})
+    table.insert(help_line, {" Accept suggestion"})
+  else
+    table.insert(help_line, {"󰌒  Accept suggestion", "Comment"})
   end
   table.insert(lines, help_line)
 
@@ -228,6 +242,23 @@ function NewProjectForm.can_validation_be_forced(code, prev_code)
   return code == "project_name_exists" or code == "no_such_directory"
 end
 
+function NewProjectForm:accept_suggestion()
+  if self.suggested_project == nil then
+    return
+  end
+  vim.api.nvim_buf_set_lines(self.buf, 0, -1, false, {
+    self.suggested_project.name,
+    self.suggested_project.path,
+  })
+  self:clear_suggestion()
+end
+
+function NewProjectForm:clear_suggestion()
+  vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1)
+  self.suggested_project = nil
+  self:draw_footer()
+end
+
 function NewProjectForm:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
@@ -246,10 +277,12 @@ function NewProjectForm:_attach_event_handlers()
       local lines = utils.clamp_buffer_value_lines(buf, 2, {exact = true})
       self.name = lines[1]
       self.path = lines[2]
-      local form = self
+      if string.len(self.name) > 0 or string.len(self.path) > 0 then
+        self:clear_suggestion()
+      end
       vim.schedule(function()
-        form.validation = nil
-        form:draw_footer()
+        self.validation = nil
+        self:draw_footer()
       end)
     end,
   })
@@ -261,31 +294,37 @@ function NewProjectForm:_attach_event_handlers()
     end,
   })
 
+  -- Confirm new project on enter keypress.
   vim.keymap.set(
     {"i", "n"},
     "<cr>",
     function()
-      self:confirm()
+      local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
+      if has_values then
+        self:confirm()
+        return ""
+      end
+      -- Fallback to default return behavior.
+      return vim.api.nvim_replace_termcodes("<cr>", true, false, true)
     end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
+    {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
   )
-  -- Next field on tab keypress.
-  -- vim.keymap.set(
-  --   "n",
-  --   "<tab>",
-  --   function()
-  --     if self.step == 1 then
-  --       self.step = 2
-  --       vim.api.nvim_buf_set_lines(buf, 0, -1, false, {self.path})
-  --     else
-  --       self.step = 1
-  --       vim.api.nvim_buf_set_lines(buf, 0, -1, false, {self.name})
-  --     end
-  --     self:draw()
-  --   end,
-  --   {noremap = true, silent = true, nowait = true, buffer = buf}
-  -- )
-
+  -- Accept suggestion on tab keypress.
+  vim.keymap.set(
+    {"i", "n"},
+    "<tab>",
+    function()
+      if self.suggested_project ~= nil then
+        vim.schedule(function()
+          self:accept_suggestion()
+        end)
+        return ""
+      end
+      -- Fallback to default tab behavior.
+      return vim.api.nvim_replace_termcodes("<tab>", true, false, true)
+    end,
+    {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
+  )
   -- Close on q keypress.
   vim.keymap.set(
     "n",
@@ -309,6 +348,43 @@ function NewProjectForm:_attach_event_handlers()
       end)
     end,
   })
+end
+
+function NewProjectForm:_suggest_project()
+  local datastore = require("hopper.db").datastore()
+  local existing_projects = datastore:list_projects()
+  local existing_projects_by_path = {} ---@type table<string, hopper.Project>
+  for _, project in ipairs(existing_projects) do
+    existing_projects_by_path[project.path] = project
+  end
+
+  local base_path = loop.cwd()
+  local possible_projects = projects.list_projects_from_path(base_path)
+  local suggested_project = nil ---@type hopper.Project | nil
+  for _, possible_project in ipairs(possible_projects) do
+    if existing_projects_by_path[possible_project.path] == nil then
+      -- We don't hae a project at this path yet. We'll go ahead and use this one as the
+      -- suggestion.
+      suggested_project = possible_project
+      break
+    end
+  end
+  if suggested_project ~= nil then
+    vim.schedule(function()
+      if string.len(self.name) < 1 and string.len(self.path) < 1 then
+        self.suggested_project = suggested_project
+        vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
+          virt_text = {{suggested_project.name, "Comment"}},
+          virt_text_pos = "overlay",
+        })
+        vim.api.nvim_buf_set_extmark(self.buf, self.ns, 1, 0, {
+          virt_text = {{suggested_project.path, "Comment"}},
+          virt_text_pos = "overlay",
+        })
+        self:draw_footer()
+      end
+    end)
+  end
 end
 
 ---@return boolean

@@ -85,19 +85,56 @@ end
 -- Clamp buffer value to given number of lines and return result.
 function M.clamp_buffer_value_lines(buf, num_lines, opts)
   opts = opts or {}
-  local lines = vim.api.nvim_buf_get_lines(buf, 0, num_lines, false)
+  local line_count = vim.api.nvim_buf_line_count(buf)
+
   if opts.exact then
-    while #lines < num_lines do
-      table.insert(lines, "")
-      -- Call it after a while as a failsafe. If we get up to 1000 lines, something has gone wrong
-      -- with this while loop.
-      if #lines > 1000 then
-        break
+    if line_count < num_lines then
+      -- Append blanks until we reach num_lines
+      local blanks = {}
+      for _ = 1, num_lines - line_count do
+        blanks[#blanks+1] = ""
       end
+      vim.api.nvim_buf_set_lines(buf, -1, -1, false, blanks)
+      line_count = num_lines
+    elseif line_count > num_lines then
+      -- Delete surplus lines (0-based start index)
+      vim.api.nvim_buf_set_lines(buf, num_lines, -1, false, {})
+      line_count = num_lines
     end
+  else
+    if line_count > num_lines then
+      vim.api.nvim_buf_set_lines(buf, num_lines, -1, false, {})
+      line_count = num_lines
+    end
+    -- If count < num_lines, we **do nothing** (no padding) in non-exact mode
   end
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  return lines
+
+  -- Always guarantee at least ONE line so extmarks at (0,0) are valid.
+  -- (Only needed if someone calls with num_lines == 0 or an empty new buffer
+  -- and exact=false.)
+  if vim.api.nvim_buf_line_count(buf) == 0 then
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {""})
+  end
+
+  -- Return up to num_lines (or current count if smaller)
+  local to = math.min(num_lines, vim.api.nvim_buf_line_count(buf))
+  return vim.api.nvim_buf_get_lines(buf, 0, to, false)
+
+  -- opts = opts or {}
+  -- local lines = vim.api.nvim_buf_get_lines(buf, 0, num_lines, false)
+  -- if opts.exact then
+  --   while #lines < num_lines do
+  --     table.insert(lines, "")
+  --     -- Call it after a while as a failsafe. If we get up to 1000 lines, something has gone wrong
+  --     -- with this while loop.
+  --     if #lines > 1000 then
+  --       break
+  --     end
+  --   end
+  -- end
+  -- vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  -- return lines
+
 end
 
 
