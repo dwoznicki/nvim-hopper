@@ -54,8 +54,8 @@ function NewProjectForm._reset(form)
 end
 
 ---@class hopper.NewProjectFormOpenOptions
----@field on_created? fun(form: hopper.NewProjectForm)
----@field on_cancel? fun(form: hopper.NewProjectForm)
+---@field on_created fun(form: hopper.NewProjectForm) | nil
+---@field on_cancel fun(form: hopper.NewProjectForm) | nil
 
 ---@param opts? hopper.NewProjectFormOpenOptions
 function NewProjectForm:open(opts)
@@ -108,7 +108,7 @@ function NewProjectForm:open(opts)
     style = "minimal",
     relative = "editor",
     width = win_config.width,
-    height = 2,
+    height = self.default_footer_win_height,
     row = win_config.row + win_config.height - 1,
     col = win_config.col + 1,
     focusable = false,
@@ -479,8 +479,8 @@ function M.change_current_project(opts)
 end
 
 ---@class hopper.OpenProjectMenuOptions
----@field on_new_project_created? fun(form: hopper.NewProjectForm)
----@field on_current_project_changed? fun()
+---@field on_new_project_created fun(form: hopper.NewProjectForm) | nil
+---@field on_current_project_changed fun() | nil
 
 ---@param opts? hopper.OpenProjectMenuOptions
 function M.open_project_menu(opts)

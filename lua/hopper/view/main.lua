@@ -198,6 +198,26 @@ function MainFloat:close()
   MainFloat._reset(self)
 end
 
+---@class hopper.NewReopenMainFloatOptions
+---@field project_source "self" | "current"
+
+---@param opts? hopper.NewReopenMainFloatOptions
+---@return fun(el?: hopper.KeymapForm | hopper.NewProjectForm)
+function MainFloat:_new_reopen_callback(opts)
+  opts = opts or {}
+  local prior_buf = self.prior_buf
+  local project = self.project
+  return function(el)
+    if el ~= nil then
+      el:close()
+    end
+    if opts.project_source == "current" then
+      project = projects.current_project()
+    end
+    self:open({prior_buf = prior_buf, project = project})
+  end
+end
+
 ---@param files hopper.FileMapping[]
 function MainFloat:_set_files(files)
   local tree = {} ---@type hopper.KeymapFileTree
@@ -283,17 +303,17 @@ function MainFloat:_attach_event_handlers()
     "K",
     function()
       local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
-      local options = {
-        project = self.project,
-        prior_buf = self.prior_buf,
-      }
-      require("hopper.view.keymap").float():open(
+      -- local options = {
+      --   project = self.project,
+      --   prior_buf = self.prior_buf,
+      -- }
+      local reopen_main = self:_new_reopen_callback()
+      require("hopper.view.keymap_ui").form():open(
         path,
         {
           project = self.project,
-          go_back = function()
-            self:open(options)
-          end,
+          on_back = reopen_main,
+          on_keymap_set = reopen_main,
         }
       )
     end,
@@ -304,14 +324,10 @@ function MainFloat:_attach_event_handlers()
     "n",
     "p",
     function()
+      local reopen_main = self:_new_reopen_callback({project_source = "current"})
       require("hopper.view.project_ui").open_project_menu({
-        on_new_project_created = function(form)
-          form:close()
-          self:open({prior_buf = self.prior_buf})
-        end,
-        on_current_project_changed = function()
-          self:open({prior_buf = self.prior_buf})
-        end,
+        on_new_project_created = reopen_main,
+        on_current_project_changed = reopen_main,
       })
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}

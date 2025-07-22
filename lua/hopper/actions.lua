@@ -6,7 +6,7 @@ function M.new_keymap()
   local project = projects.current_project()
   local file_path = vim.api.nvim_buf_get_name(0)
   local path = projects.path_from_project_root(project.path, file_path)
-  local float = require("hopper.view.keymap").float()
+  local float = require("hopper.view.keymap_ui").form()
   float:open(path)
 end
 
