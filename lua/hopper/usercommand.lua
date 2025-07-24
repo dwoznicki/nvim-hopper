@@ -20,9 +20,9 @@ local function handle_command(opts)
     )
     local datastore = require("hopper.db").datastore()
     local assigned_keymaps = require("hopper.utils").set(datastore:list_keymaps("x"))
-    local allowed_keys = require("hopper.utils").set(require("hopper.options").options().files.keyset)
+    local allowed_keys = require("hopper.utils").set(require("hopper.options").options().keymapping.keyset)
     for _, file in ipairs(files) do
-      local keymap = require("hopper.quickfile").keymap_for_path(file, 4, allowed_keys, assigned_keymaps)
+      local keymap = require("hopper.keymaps").keymap_for_path(file, 4, allowed_keys, assigned_keymaps)
       pstmt:exec_update({"x", file, keymap})
       assigned_keymaps[keymap] = true
       print("Finished " .. file .. " " .. keymap)

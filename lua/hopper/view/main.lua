@@ -1,11 +1,6 @@
 local utils = require("hopper.utils")
-local quickfile = require("hopper.quickfile")
+local keymaps = require("hopper.keymaps")
 local projects = require("hopper.projects")
-
-local ns_id = vim.api.nvim_create_namespace("hopper.MainFloat")
-local footer_ns_id = vim.api.nvim_create_namespace("hopper.MainFloatFooter")
---TODO: Make this configurable.
-local num_chars = 2
 
 local M = {}
 
@@ -23,9 +18,13 @@ local M = {}
 ---@field footer_buf integer
 ---@field footer_win integer
 ---@field prior_buf integer
+---@field keymap_length integer
 local MainFloat = {}
 MainFloat.__index = MainFloat
 M.MainFloat = MainFloat
+
+MainFloat.ns = vim.api.nvim_create_namespace("hopper.MainFloat")
+MainFloat.footer_ns = vim.api.nvim_create_namespace("hopper.MainFloatFooter")
 
 ---@return hopper.MainFloat
 function MainFloat._new()
@@ -47,11 +46,13 @@ function MainFloat._reset(float)
   float.footer_buf = -1
   float.footer_win = -1
   float.prior_buf = -1
+  float.keymap_length = -1
 end
 
 ---@class hopper.OpenMainFloatOptions
 ---@field project hopper.Project | string | nil
 ---@field prior_buf integer | nil
+---@field keymap_length integer | nil
 
 ---@param opts? hopper.OpenMainFloatOptions
 function MainFloat:open(opts)
@@ -62,6 +63,7 @@ function MainFloat:open(opts)
     self.project = projects.current_project()
   end
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
+  self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
 
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, win_height = utils.get_win_dimensions()
@@ -133,13 +135,13 @@ function MainFloat:open(opts)
 end
 
 function MainFloat:draw()
-  vim.api.nvim_buf_clear_namespace(self.buf, ns_id, 0, -1) -- clear highlights
+  vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1) -- clear highlights
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
   local used = string.len(value)
-  vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
+  vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
     virt_text = {
-      {string.format("%d/%d", used, num_chars), "Comment"}
+      {string.format("%d/%d", used, self.keymap_length), "Comment"}
     },
     virt_text_pos = "right_align",
   })
@@ -148,13 +150,13 @@ function MainFloat:draw()
 
   local next_key_index = used + 1
   for _, file in ipairs(self.filtered_files) do
-    local path = quickfile.truncate_path(file.path, self.win_width - 2)
-    local keymap_indexes = quickfile.keymap_location_in_path(path, file.keymap, {missing_behavior = "nearby"})
-    local path_line = quickfile.highlight_path_virtual_text(path, file.keymap, keymap_indexes, {next_key_index = next_key_index})
+    local path = keymaps.truncate_path(file.path, self.win_width - 2)
+    local keymap_indexes = keymaps.keymap_location_in_path(path, file.keymap, {missing_behavior = "nearby"})
+    local path_line = keymaps.highlight_path_virtual_text(path, file.keymap, keymap_indexes, {next_key_index = next_key_index})
     table.insert(virtual_lines, path_line)
   end
 
-  vim.api.nvim_buf_set_extmark(self.buf, ns_id, 0, 0, {
+  vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
     virt_lines = virtual_lines,
     virt_lines_above = false,
     virt_lines_leftcol = false,
@@ -162,7 +164,7 @@ function MainFloat:draw()
 end
 
 function MainFloat:draw_footer()
-  vim.api.nvim_buf_clear_namespace(self.footer_buf, footer_ns_id, 0, -1)
+  vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
   local help_line = {{" "}} ---@type string[][]
   local curr_mode = vim.api.nvim_get_mode().mode
   if curr_mode == "n" then
@@ -176,13 +178,13 @@ function MainFloat:draw_footer()
     table.insert(help_line, {"  "})
     table.insert(help_line, {"p Project menu", "Comment"})
   end
-  vim.api.nvim_buf_set_extmark(self.footer_buf, footer_ns_id, 0, 0, {
+  vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_text = help_line,
     virt_text_pos = "overlay",
   })
 
   local project_line = {{" " .. self.project.name .. " ", "hopper.hl.ProjectTag"}, {" "}}
-  vim.api.nvim_buf_set_extmark(self.footer_buf, footer_ns_id, 0, 0, {
+  vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_text = project_line,
     virt_text_pos = "right_align",
   })
@@ -246,7 +248,7 @@ function MainFloat:_attach_event_handlers()
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged", "TextChangedP"}, {
     buffer = buf,
     callback = function()
-      local value = utils.clamp_buffer_value_chars(buf, num_chars)
+      local value = utils.clamp_buffer_value_chars(buf, self.keymap_length)
       -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
       vim.print(value)

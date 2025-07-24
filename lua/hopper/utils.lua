@@ -119,23 +119,12 @@ function M.clamp_buffer_value_lines(buf, num_lines, opts)
   -- Return up to num_lines (or current count if smaller)
   local to = math.min(num_lines, vim.api.nvim_buf_line_count(buf))
   return vim.api.nvim_buf_get_lines(buf, 0, to, false)
-
-  -- opts = opts or {}
-  -- local lines = vim.api.nvim_buf_get_lines(buf, 0, num_lines, false)
-  -- if opts.exact then
-  --   while #lines < num_lines do
-  --     table.insert(lines, "")
-  --     -- Call it after a while as a failsafe. If we get up to 1000 lines, something has gone wrong
-  --     -- with this while loop.
-  --     if #lines > 1000 then
-  --       break
-  --     end
-  --   end
-  -- end
-  -- vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  -- return lines
-
 end
 
+---@param value any
+---@return boolean
+function M.is_integer(value)
+  return type(value) == "number" and math.floor(value) == value
+end
 
 return M

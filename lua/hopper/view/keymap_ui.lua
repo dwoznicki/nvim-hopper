@@ -1,9 +1,7 @@
 local utils = require("hopper.utils")
-local quickfile = require("hopper.quickfile")
+local keymaps = require("hopper.keymaps")
 local projects = require("hopper.projects")
 
---TODO: Make this configurable.
-local num_chars = 2
 local loop = vim.uv or vim.loop
 
 ---@alias hopper.HighlightLocation {name: string, row: integer, col_start: integer, col_end: integer}
@@ -27,6 +25,7 @@ local M = {}
 ---@field footer_win integer
 ---@field validation hopper.KeymapFormValidation | nil
 ---@field suggested_keymap string | nil
+---@field keymap_length integer | nil
 ---@field on_keymap_set fun(form: hopper.KeymapForm) | nil
 ---@field on_back fun(form: hopper.KeymapForm) | nil
 local KeymapForm = {}
@@ -58,12 +57,14 @@ function KeymapForm._reset(form)
   form.footer_win = -1
   form.validation = nil
   form.suggested_keymap = nil
+  form.keymap_length = -1
   form.on_keymap_set = nil
   form.on_back = nil
 end
 
 ---@class hopper.KeymapFormOpenOptions
 ---@field project hopper.Project | string | nil
+---@field keymap_length integer | nil
 ---@field on_keymap_set fun(float: hopper.KeymapForm) | nil
 ---@field on_back fun(float: hopper.KeymapForm) | nil
 
@@ -76,6 +77,7 @@ function KeymapForm:open(path, opts)
   else
     self.project = projects.current_project()
   end
+  self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
   self.on_keymap_set = opts.on_keymap_set
   self.on_back = opts.on_back
 
@@ -83,7 +85,7 @@ function KeymapForm:open(path, opts)
   local win_width, _ = utils.get_win_dimensions()
   self.win_width = win_width
 
-  self.path = quickfile.truncate_path(path, win_width)
+  self.path = keymaps.truncate_path(path, win_width)
 
   local datastore = require("hopper.db").datastore()
   local existing_file = datastore:get_file_by_path(self.project.name, path)
@@ -176,7 +178,7 @@ function KeymapForm:draw_main()
   local used = string.len(value)
   vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
     virt_text = {
-      {string.format("%d/%d", used, num_chars), "Comment"}
+      {string.format("%d/%d", used, self.keymap_length), "Comment"}
     },
     virt_text_pos = "right_align",
   })
@@ -190,39 +192,8 @@ function KeymapForm:draw_main()
 
   local lines = {} ---@type string[][][]
 
-  local keymap_indexes = quickfile.keymap_location_in_path(self.path, self.keymap, {missing_behavior = "nearby"})
-  local path_line = quickfile.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
-
-  -- local help_line = {{"  "}} ---@type string[][]
-  -- if self:_keymap_ok() then
-  --   table.insert(help_line, {"󰌑 ", "Function"})
-  --   table.insert(help_line, {" Confirm"})
-  -- else
-  --   table.insert(help_line, {"󰌑  Confirm", "Comment"})
-  -- end
-  -- table.insert(help_line, {"  "})
-  -- if string.len(value) < 1 then
-  --   table.insert(help_line, {"󰌒 ", "String"})
-  --   table.insert(help_line, {" Suggest"})
-  -- else
-  --   table.insert(help_line, {"󰌒  Suggest", "Comment"})
-  -- end
-
-  -- local error_line = nil ---@type string[][]
-  -- local next_win_height ---@type integer
-  -- if self.conflicting_mapping ~= nil then
-  --   local errmsg = "Conflicting mapping found: "
-  --   local conflicting_path = quickfile.truncate_path(self.conflicting_mapping.path, self.win_width - vim.fn.strdisplaywidth(errmsg) - 2)
-  --   next_win_height = 4
-  --   error_line = {
-  --     {errmsg .. conflicting_path, "Error"},
-  --   }
-  -- else
-  --   next_win_height = 3
-  -- end
-  -- if vim.api.nvim_win_get_height(self.win) ~= next_win_height then
-  --   vim.api.nvim_win_set_height(self.win, next_win_height)
-  -- end
+  local keymap_indexes = keymaps.keymap_location_in_path(self.path, self.keymap, {missing_behavior = "nearby"})
+  local path_line = keymaps.highlight_path_virtual_text(self.path, self.keymap, keymap_indexes)
 
   table.insert(lines, path_line)
 
@@ -320,8 +291,8 @@ function KeymapForm:_suggest_keymap()
   end
   local datastore = require("hopper.db").datastore()
   local assigned_keymaps = utils.set(datastore:list_keymaps(self.project.name))
-  local allowed_keys = utils.set(require("hopper.options").options().files.keyset)
-  local suggested_keymap = quickfile.keymap_for_path(self.path, 4, allowed_keys, assigned_keymaps)
+  local allowed_keys = utils.set(require("hopper.options").options().keymapping.keyset)
+  local suggested_keymap = keymaps.keymap_for_path(self.path, 4, allowed_keys, assigned_keymaps)
   self.suggested_keymap = suggested_keymap
   self:draw()
 end
@@ -372,7 +343,7 @@ function KeymapForm:_attach_event_handlers()
     callback = function()
       -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
-      local value = utils.clamp_buffer_value_chars(buf, num_chars)
+      local value = utils.clamp_buffer_value_chars(buf, self.keymap_length)
       self.keymap = value
       if string.len(value) > 0 then
         self:clear_suggestion()
@@ -485,7 +456,7 @@ end
 
 ---@return boolean
 function KeymapForm:_keymap_ok()
-  if string.len(self.keymap) < num_chars then
+  if string.len(self.keymap) < self.keymap_length then
     -- Keymap must have exactly specified number of characters.
     return false
   end

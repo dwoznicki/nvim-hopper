@@ -2,7 +2,6 @@ local utils = require("hopper.utils")
 local projects = require("hopper.projects")
 
 local footer_ns_id = vim.api.nvim_create_namespace("hopper.AvailableKeymapsFooter")
-local num_chars = 2
 
 local M = {}
 
@@ -13,6 +12,7 @@ local M = {}
 ---@field win integer
 ---@field footer_buf integer
 ---@field footer_win integer
+---@field keymap_length integer
 local InfoOverlay = {}
 InfoOverlay.__index = InfoOverlay
 M.InfoOverlay = InfoOverlay
@@ -33,10 +33,12 @@ function InfoOverlay._reset(overlay)
   overlay.win = -1
   overlay.footer_buf = -1
   overlay.footer_win = -1
+  overlay.keymap_length = -1
 end
 
 ---@class hopper.OpenInfoOverlayOptions
 ---@field project hopper.Project | string | nil
+---@field keymap_length integer | nil
 
 ---@param opts? hopper.OpenInfoOverlayOptions
 function InfoOverlay:open(opts)
@@ -46,6 +48,7 @@ function InfoOverlay:open(opts)
   else
     self.project = projects.current_project()
   end
+  self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", {buf = buf})
@@ -120,13 +123,13 @@ function InfoOverlay:init()
   loop.new_timer():start(0, 0, function()
     local datastore = require("hopper.db").datastore()
     local existing_keymaps = utils.set(datastore:list_keymaps(self.project.name))
-    local allowed_keys = require("hopper.options").options().files.keyset
+    local allowed_keys = require("hopper.options").options().keymapping.keyset
     local num_allowed_keys = #allowed_keys
-    local total_keymap_permutions = num_allowed_keys ^ num_chars
+    local total_keymap_permutions = num_allowed_keys ^ self.keymap_length
     local num_tried = 0
     local available_keymaps = {} ---@type string[]
     local this_keymap_indexes = {} ---@type integer[]
-    for _ = 1, num_chars do
+    for _ = 1, self.keymap_length do
       table.insert(this_keymap_indexes, 1)
     end
     local incr_index = #this_keymap_indexes

@@ -1,7 +1,6 @@
 local state = require("hopper.state")
 
 ---@alias BufhopperMode "jump" | "normal"
----@alias hopper.Mode "jump" | "normal"
 
 local M = {}
 

@@ -2,9 +2,11 @@
 ---@field default_background string
 ---@field secondary_text string
 ---@field text_selection string
+---@field project string
 ---@field first_key string
 ---@field second_key string
----@field project string
+---@field third_key string
+---@field fourth_key string
 
 local M = {}
 
@@ -20,9 +22,11 @@ local function try_load_kanagawa()
     default_background = kanagawa_colors.palette.sumiInk1,
     secondary_text = kanagawa_colors.palette.fujiGray,
     text_selection = kanagawa_colors.palette.waveBlue1,
+    project = kanagawa_colors.palette.oniViolet,
     first_key = kanagawa_colors.palette.waveRed,
     second_key = kanagawa_colors.palette.springBlue,
-    project = kanagawa_colors.palette.oniViolet,
+    third_key = kanagawa_colors.palette.carpYellow,
+    fourth_key = kanagawa_colors.palette.springGreen,
   }
 end
 
@@ -34,12 +38,17 @@ local function setup_higlights()
   vim.api.nvim_set_hl(0, "hopper.hl.SecondaryText", {fg = palette.secondary_text})
   vim.api.nvim_set_hl(0, "hopper.hl.SelectedText", {bg = palette.text_selection})
 
+  vim.api.nvim_set_hl(0, "hopper.hl.ProjectText", {fg = palette.project})
+  vim.api.nvim_set_hl(0, "hopper.hl.ProjectTag", {fg = palette.default_background, bg = palette.project})
+
   vim.api.nvim_set_hl(0, "hopper.hl.FirstKey", {fg = palette.first_key})
   vim.api.nvim_set_hl(0, "hopper.hl.FirstKeyNext", {fg = palette.first_key, underline = true})
   vim.api.nvim_set_hl(0, "hopper.hl.SecondKey", {fg = palette.second_key})
   vim.api.nvim_set_hl(0, "hopper.hl.SecondKeyNext", {fg = palette.second_key, underline = true})
-  vim.api.nvim_set_hl(0, "hopper.hl.ProjectText", {fg = palette.project})
-  vim.api.nvim_set_hl(0, "hopper.hl.ProjectTag", {fg = palette.default_background, bg = palette.project})
+  vim.api.nvim_set_hl(0, "hopper.hl.ThirdKey", {fg = palette.third_key})
+  vim.api.nvim_set_hl(0, "hopper.hl.ThirdKeyNext", {fg = palette.third_key, underline = true})
+  vim.api.nvim_set_hl(0, "hopper.hl.FourthKey", {fg = palette.fourth_key})
+  vim.api.nvim_set_hl(0, "hopper.hl.FourthKeyNext", {fg = palette.fourth_key, underline = true})
 
   vim.api.nvim_set_hl(0, "hopper.hl.FloatFooter", {fg = "#DCD7BA", bg = "#2A2A37"})
 end
