@@ -1,7 +1,8 @@
 local keymaps = require("hopper.keymaps")
+local utils = require("hopper.utils")
 
 describe("keymaps", function()
-  describe("truncate_path", function()
+  describe("#truncate_path", function()
     it("should truncate path to available width (20 chars)", function()
       assert.equal(
         "this/…/Component.jsx",
@@ -32,7 +33,7 @@ describe("keymaps", function()
         keymaps.truncate_path("some-long-winded-dir-name/SomeFileName.tsx", 20)
       )
     end)
-    it("should properly truncate absolute paths #only", function()
+    it("should properly truncate absolute paths", function()
       assert.equal(
         "/user/…/dummy/absolute/path.py",
         keymaps.truncate_path("/user/somebody/dummy/absolute/path.py", 30)
@@ -40,7 +41,7 @@ describe("keymaps", function()
     end)
   end)
 
-  describe("keymap_location_in_path", function()
+  describe("#keymap_location_in_path", function()
     it("should pick correct indexes (filename only)", function()
       assert.same(
         {1, 2},
@@ -142,6 +143,56 @@ describe("keymaps", function()
       assert.same(
         {5, 6},
         keymaps.keymap_location_in_path("file", "qq", {missing_behavior = "nearby"})
+      )
+    end)
+  end)
+  describe("#keymap_for_path", function()
+    it("should find simple keymap from path", function()
+      assert.same(
+        "wo",
+        keymaps.keymap_for_path(
+          "/hello/world.txt",
+          2,
+          2,
+          utils.set(keymaps.keysets.alphanumeric),
+          {}
+        )
+      )
+    end)
+    it("should skip existing keymaps and find next best", function()
+      assert.same(
+        "wl",
+        keymaps.keymap_for_path(
+          "/hello/world.txt",
+          2,
+          2,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({"wo", "wr"})
+        )
+      )
+    end)
+    it("should circle back around to use earlier characters in path token when necessary", function()
+      assert.same(
+        "ow",
+        keymaps.keymap_for_path(
+          "/h/wor",
+          2,
+          2,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({"wo", "wr", "wh", "or"})
+        )
+      )
+    end)
+    it("should use characters from earlier path tokens when necessary #only", function()
+      assert.same(
+        "he",
+        keymaps.keymap_for_path(
+          "/hel/wo",
+          2,
+          2,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({"wo", "wh", "we", "wl", "ow", "oh", "oe", "ol"})
+        )
       )
     end)
   end)

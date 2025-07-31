@@ -32,92 +32,410 @@ local M = {}
 --   end
 -- end
 
+M.keysets = {
+  ---@type string[]
+  alpha = {
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+  },
+  ---@type string[]
+  numeric = {
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+  },
+  ---@type string[]
+  alphanumeric = {
+    "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+  },
+  ---@type string[]
+  ergonomic = {
+    "a", "s", "d", "f", "g", "h", "j", "k", "l", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "z", "x", "c", "v", "b", "n", "m", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ";", ",", ".", "'", "[", "]", "/",
+  },
+}
+
+---@param keymap_locations integer[][]
+---@param location integer[]
+---@return boolean
+local function location_already_referenced(keymap_locations, location)
+  for _, loc in ipairs(keymap_locations) do
+    if loc[1] == location[1] and loc[2] == location[2] then
+      return true
+    end
+  end
+  return false
+end
+
+
+---@param tried_char_indexes integer[]
+---@param chars string[]
+---@param char_idx integer
+---@return integer index or -1 to indicate we're out of viable options
+local function get_next_char_index(tried_char_indexes, chars, char_idx)
+  local next_char_idx = char_idx
+  while true do
+    next_char_idx = next_char_idx + 1
+    if next_char_idx > #chars then
+      next_char_idx = 1
+    end
+    if next_char_idx == char_idx then
+      return -1
+    end
+    -- if tried_char_indexes[next_char_idx] == nil then
+    if not vim.tbl_contains(tried_char_indexes, next_char_idx) then
+      return next_char_idx
+    end
+  end
+end
+
 ---@param path string | string[]
 ---@param num_path_tokens_to_check integer
+---@param keymap_length integer
 ---@param allowed_keys table<string, any>
 ---@param assigned_keymaps table<string, any>
 ---@return string best_keymap
-function M.keymap_for_path(path, num_path_tokens_to_check, allowed_keys, assigned_keymaps)
-  local path_tokens ---@type string[]
-  if type(path) == "table" then
-    path_tokens = path
-  else
-    path_tokens = vim.split(path, "/")
+function M.keymap_for_path(path, num_path_tokens_to_check, keymap_length, allowed_keys, assigned_keymaps)
+  if type(path) == "string" then
+    path = vim.split(path, "/")
+  end
+  local tokenized_path = {} ---@type string[][]
+  for _, part in ipairs(path) do
+    if string.len(part) > 0 then
+      table.insert(tokenized_path, vim.split(part, ""))
+    end
   end
 
-  local tried_first_keys = {} ---@type table<string, true>
+  -- Give up after we've checked some number of path tokens, based on the number specified
+  -- by `num_path_tokens_to_check.
+  --
+  -- For example,
+  -- path = "/path/to/some/random/file.txt"
+  -- num_path_tokens_to_check = 2
+  --
+  -- "path", "to", "some", ⏐ "random", "file.txt"
+  --                       ⏐
+  --       unchecked       ⏐       checked
+  local min_path_idx = math.max(#tokenized_path - num_path_tokens_to_check, 1)
 
-  -- Try to get the first letter of the filename as the first keymap letter.
-  -- We do this to try an make the keymap mnemonic.
-  -- If we can't find a valid candidate, we'll try the next letter in the filename, and so on.
-  for i = #path_tokens, math.max(#path_tokens - num_path_tokens_to_check, 1), -1 do
-    local path_token = path_tokens[i]
+  ---@alias hopper.TriedKey {char: string, path_idx: integer, char_idx: integer}
 
-    local first_char = nil ---@type string | nil
-    local first_char_idx = -1 ---@type integer
-    local path_token_chars = vim.split(path_token, "")
-    for j, char in ipairs(path_token_chars) do
-      char = string.lower(char)
-      if allowed_keys[char] ~= nil and tried_first_keys[char] == nil then
-        first_char = char
-        first_char_idx = j
-        break
+  local tried_keys = {} ---@type hopper.TriedKey[][]
+  local tried_keymaps = {} ---@type table<string, true>
+  local closest_try = ""
+  local try_key_idx = 1
+  local path_idx = #tokenized_path
+  local char_idx = 1
+
+  vim.print(tokenized_path)
+  while true do
+    local char = tokenized_path[path_idx][char_idx]
+    vim.print("--> " .. path_idx .. " " .. char_idx .. " " .. char)
+    -- vim.print(tried_keys)
+    if tried_keys[try_key_idx] == nil then
+      tried_keys[try_key_idx] = {}
+    end
+    assert(char ~= nil)
+    table.insert(tried_keys[try_key_idx], {char = char, path_idx = path_idx, char_idx = char_idx})
+    local keymap_try = ""
+    for _, tried_key_list in ipairs(tried_keys) do
+      keymap_try = keymap_try .. tried_key_list[#tried_key_list].char
+    end
+    local is_valid_keymap = allowed_keys[char] ~= nil and assigned_keymaps[keymap_try] == nil
+    vim.print(string.format("keymap_try = %s", keymap_try))
+    vim.print(string.format("valid? %s", is_valid_keymap))
+
+    if is_valid_keymap then
+      if string.len(keymap_try) >= keymap_length then
+        return keymap_try
+      end
+      if string.len(keymap_try) > string.len(closest_try) then
+        closest_try = keymap_try
       end
     end
-    -- Try to find a reasonable second key.
-    if first_char ~= nil then
-      -- First, look at the other characters in this path token, minus this exact character.
-      for j, char in ipairs(path_token_chars) do
-        char = string.lower(char)
-        local possible_keymap = first_char .. char
-        if j ~= first_char_idx
-          and allowed_keys[char] ~= nil
-          and assigned_keymaps[possible_keymap] == nil
-        then
-          -- We found an available keymap. Hooray!
-          return possible_keymap
-        end
-      end
-      -- Second, look for available characters the other significant path tokens.
-      for j = #path_tokens, math.max(#path_tokens - num_path_tokens_to_check, 1), -1 do
-        if j ~= i then
-          local other_path_token = path_tokens[j]
-          local other_path_token_chars = vim.split(other_path_token, "")
-          for _, char in ipairs(other_path_token_chars) do
-            char = string.lower(char)
-            local possible_keymap = first_char .. char
-            if allowed_keys[char] ~= nil and assigned_keymaps[possible_keymap] == nil then
-              -- We found an available keymap. Hooray!
-              -- return possible_keymap, {i, first_char_idx, j, k}
-              return possible_keymap
-            end
+
+    local next_try_key_idx = try_key_idx
+    local next_path_idx = path_idx
+    local next_char_idx = char_idx
+    local nothing_left_to_try = false
+    while true do
+      local tried_char_indexes = {} ---@type integer[]
+      for i, tried_key_list in ipairs(tried_keys) do
+        for j, tried_key in ipairs(tried_key_list) do
+          if tried_key.path_idx == next_path_idx and (i == next_try_key_idx or j == #tried_key_list) then
+            table.insert(tried_char_indexes, tried_key.char_idx)
           end
         end
       end
-      -- Third, just start trying other available characters.
-      for char, _ in pairs(allowed_keys) do
-        local possible_keymap = first_char .. char
-        if assigned_keymaps[possible_keymap] == nil then
-          return possible_keymap
+      if #tokenized_path[next_path_idx] > #tried_char_indexes then
+        vim.print("tried_char_indexes")
+        vim.print(tried_char_indexes)
+        vim.print("next_char_idx " .. next_char_idx)
+        local next_best_char_idx = -1
+        for i, _ in ipairs(tokenized_path[next_path_idx]) do
+          if not vim.tbl_contains(tried_char_indexes, i) then
+            if next_best_char_idx == -1 or i > next_char_idx then
+              next_best_char_idx = i
+              if i > next_char_idx then
+                break
+              end
+            -- elseif i > next_char_idx then
+            --   vim.print("finalized to " .. i)
+            --   next_best_char_idx = i
+            --   break
+            end
+          end
         end
+        vim.print("next_best_char_idx " .. next_best_char_idx)
+        next_char_idx = next_best_char_idx
+      else
+        vim.print("NO MORE CHARS TO CHECK IN THIS PATH TOKEN")
+        vim.print(string.format("path len %d", #tokenized_path[next_path_idx]))
+        vim.print(string.format("next_path_idx %d", next_try_key_idx))
+        vim.print(string.format("tried keys len %d", #tried_keys[next_try_key_idx]))
+        vim.print(string.format("next_try_key_idx %d", next_try_key_idx))
+        next_char_idx = -1
       end
-      -- We failed to find a good keymap with thie first character. This probably means this
-      -- character is no longer available in the first keymap slot.
-      tried_first_keys[first_char] = true
+      if next_char_idx == -1 then
+        next_path_idx = next_path_idx - 1
+        next_char_idx = 1
+        if next_path_idx < min_path_idx then
+          if #tried_keys == 0 then
+            nothing_left_to_try = true
+            break
+          else
+            vim.print(">>> GIVING UP AND TRYING DIFFERENT PATH")
+            vim.print(tried_keys[#tried_keys])
+            table.remove(tried_keys, #tried_keys)
+            vim.print("tried_keys")
+            vim.print(tried_keys)
+            next_try_key_idx = next_try_key_idx - 1
+            next_path_idx = tried_keys[next_try_key_idx][#tried_keys[next_try_key_idx]].path_idx
+            next_char_idx = tried_keys[next_try_key_idx][#tried_keys[next_try_key_idx]].char_idx
+            vim.print("next_try_key_idx " .. next_try_key_idx)
+            vim.print("next_path_idx " .. next_path_idx)
+            vim.print("next_char_idx " .. next_char_idx)
+            vim.print("<<<<")
+          end
+        else
+          -- First character in previous path token exists.
+          break
+        end
+      else
+        -- Next character in this path token exists.
+        break
+      end
+    end
+    if nothing_left_to_try then
+      break
+    end
+    if is_valid_keymap and try_key_idx == next_try_key_idx then
+      next_try_key_idx = try_key_idx + 1
+    end
+    try_key_idx = next_try_key_idx
+    path_idx = next_path_idx
+    char_idx = next_char_idx
+  end
+  -- If we've reached this point, we failed to produce a good keymap using characters from the file
+  -- path. It's time to start making random selections.
+  vim.print("random attempts from closest_try " .. closest_try)
+  local keymap_try = closest_try
+  while true do
+    local before_keymap_length = string.len(keymap_try)
+    for char, _ in pairs(allowed_keys) do
+      local next_try = closest_try .. char
+      if assigned_keymaps[next_try] == nil then
+        keymap_try = next_try
+        break
+      end
+    end
+    if string.len(keymap_try) >= keymap_length then
+      return keymap_try
+    end
+    local after_keymap_length = string.len(keymap_try)
+    if after_keymap_length == before_keymap_length then
+      if after_keymap_length == 1 then
+        -- We can't find any keymaps that look any good using characters from the file path.
+        break
+      end
+      -- We've hit a dead end with this combination so far. Try popping off the last character and
+      -- see if we can get anywhere.
+      keymap_try = string.sub(keymap_try, 1, -2)
     end
   end
-  -- If we get here, we've iterated through all path tokens, and failed to find a keymap. It's time
-  -- to start picking random junk and see what sticks.
-  for first_char, _ in pairs(allowed_keys) do
-    for second_char, _ in pairs(allowed_keys) do
-      local possible_keymap = first_char .. second_char
-      if assigned_keymaps[possible_keymap] == nil then
-        return possible_keymap
-      end
-    end
+  -- We've failed to find a good key combination using file path characters. Time to see if there
+  -- are any free combinations whatsoever that could work.
+  vim.print("just finding something random that's available")
+  local available_keymaps = M.list_available_keymaps(assigned_keymaps, allowed_keys, keymap_length)
+  if #available_keymaps > 0 then
+    return available_keymaps[1]
   end
-  -- If we get here, we've utterly failed to find a decent keymap.
-  error("Failed to find a keymap for " .. vim.iter(path_tokens):join("/"))
+  error("Unable to find keymap for path. All keymap combinations appear to be in use.")
+
+
+
+
+
+--   vim.print(allowed_keys)
+--
+--   local tried_key_combinations = {} ---@type table<string, true>
+--   local tried_char_indexes = {} ---@type integer[]
+--   local closest_combination = ""
+--   local keymap = ""
+--   local keymap_locations = {} ---@type integer[][]
+--   -- local path_idx = #tokenized_path
+--   -- local char_idx = 1
+--
+--   while true do
+--     local chars = tokenized_path[path_idx]
+--     if chars ~= nil then
+--       local char = chars[char_idx]
+--       print(path_idx .. " " .. char_idx)
+--       if char ~= nil then
+--         char = string.lower(char)
+--         print("char " .. char)
+--         local location = {path_idx, char_idx}
+--         print(string.format("allowed? %s", allowed_keys[char]))
+--         print(string.format("already referenced? %s", location_already_referenced(keymap_locations, location)))
+--         if allowed_keys[char] ~= nil and not location_already_referenced(keymap_locations, location) then
+--           local next_combination = keymap .. char
+--           vim.print("next_combination " .. next_combination)
+--           if tried_key_combinations[next_combination] == nil
+--             and assigned_keymaps[next_combination] == nil
+--           then
+--             keymap = next_combination
+--             table.insert(keymap_locations, location)
+--             if string.len(next_combination) > string.len(closest_combination) then
+--               -- Don't override existing closest combinations with new ones unless the new version
+--               -- actually includes more characters. We assume that earlier attempts are "better"
+--               -- than later attempts.
+--               closest_combination = next_combination
+--             end
+--             print("keymap " .. keymap)
+--             if string.len(keymap) >= keymap_length then
+--               -- Success!
+--               return next_combination
+--             end
+--             tried_key_combinations[next_combination] = true
+--             tried_char_indexes = {}
+--           end
+--         end
+--         table.insert(tried_char_indexes, char_idx)
+--         char_idx = get_next_char_index(tried_char_indexes, chars, char_idx)
+--       else
+--         -- We're out of characters to check. Move on to the prior path part.
+--         path_idx = path_idx - 1
+--         if path_idx < math.max(#tokenized_path - num_path_tokens_to_check, 1) then
+--           -- Give up after we've checked some number of path tokens, based on the number specified
+--           -- by `num_path_tokens_to_check.
+--           --
+--           -- For example,
+--           -- path = "/path/to/some/random/file.txt"
+--           -- num_path_tokens_to_check = 2
+--           --
+--           -- "path", "to", "some", ⏐ "random", "file.txt"
+--           --                       ⏐
+--           --       unchecked       ⏐       checked
+--           path_idx = -1
+--         end
+--         tried_char_indexes = {}
+--         char_idx = 1
+--         print("decremented path " .. path_idx .. " " .. char_idx)
+--       end
+--     else
+--       -- We're out of valid path parts to check.
+--       if path_idx == -1 then
+--         -- We've run out of possible character combinations for this file path.
+--         print("Moving on to random attempts")
+--         break
+--       else
+--         -- Pop off the last character we chose, and take another swing.
+--         keymap = string.sub(keymap, 1, -2)
+--         table.remove(keymap_locations, #keymap_locations)
+--         path_idx = #tokenized_path
+--         char_idx = 1
+--         print("removing character and trying again " .. path_idx .. " " .. char_idx)
+--       end
+--     end
+--   end
+--   -- If we've reached this point, we failed to produce a good keymap using characters from the file
+--   -- path. It's time to start making random selections.
+--   vim.print("random attempts from closest_combination " .. closest_combination)
+--   keymap = closest_combination
+--   while true do
+--     local before_keymap_length = string.len(keymap)
+--     for char, _ in pairs(allowed_keys) do
+--       local next_combination = closest_combination .. char
+--       if assigned_keymaps[next_combination] == nil then
+--         keymap = next_combination
+--         break
+--       end
+--     end
+--     if string.len(keymap) >= keymap_length then
+--       return keymap
+--     end
+--     local after_keymap_length = string.len(keymap)
+--     if after_keymap_length == before_keymap_length then
+--       if after_keymap_length == 1 then
+--         -- We can't find any keymaps that look any good using characters from the file path.
+--         break
+--       end
+--       -- We've hit a dead end with this combination so far. Try popping off the last character and
+--       -- see if we can get anywhere.
+--       keymap = string.sub(keymap, 1, -2)
+--     end
+--   end
+--   -- We've failed to find a good key combination using file path characters. Time to see if there
+--   -- are any free combinations whatsoever that could work.
+--   vim.print("just finding something random that's available")
+--   local available_keymaps = M.list_available_keymaps(assigned_keymaps, allowed_keys, keymap_length)
+--   if #available_keymaps > 0 then
+--     return available_keymaps[1]
+--   end
+--   error("Unable to find keymap for path. All keymap combinations appear to be in use.")
+-- end
+--
+-- ---@param existing_keymaps table<string, true>
+-- ---@param allowed_keys table<string, true>
+-- ---@param keymap_length integer
+-- ---@return string[] available_keymaps
+-- function M.list_available_keymaps(existing_keymaps, allowed_keys, keymap_length)
+--   local num_allowed_keys = #allowed_keys
+--   -- local total_keymap_permutions = num_allowed_keys ^ keymap_length
+--   local num_tried = 0
+--   local available_keymaps = {} ---@type string[]
+--   local this_keymap_indexes = {} ---@type integer[]
+--   for _ = 1, keymap_length do
+--     table.insert(this_keymap_indexes, 1)
+--   end
+--   local incr_index = #this_keymap_indexes
+--
+--   while true do
+--     local keymap = ""
+--     for _, idx in ipairs(this_keymap_indexes) do
+--       keymap = keymap .. allowed_keys[idx]
+--     end
+--     if not existing_keymaps[keymap] then
+--       table.insert(available_keymaps, keymap)
+--     end
+--     num_tried = num_tried + 1
+--     -- if num_tried % 50 == 0 or num_tried >= total_keymap_permutions then
+--     --   schedule_draw_progress(num_tried, #available_keymaps, total_keymap_permutions)
+--     -- end
+--     while true do
+--       this_keymap_indexes[incr_index] = this_keymap_indexes[incr_index] + 1
+--       if this_keymap_indexes[incr_index] > num_allowed_keys then
+--         this_keymap_indexes[incr_index] = 1
+--         incr_index = incr_index - 1
+--         if incr_index < 1 then
+--           break
+--         end
+--       else
+--         incr_index = #this_keymap_indexes
+--         break
+--       end
+--     end
+--     if incr_index < 1 then
+--       break
+--     end
+--   end
+--   return available_keymaps
 end
 
 ---@param path string
@@ -295,12 +613,26 @@ function M.highlight_path_virtual_text(path, keymap, keymap_indexes, opts)
       else
         hl_name = "hopper.hl.FirstKey"
       end
-    else
+    elseif idx == keymap_indexes[2] then
       key = string.sub(keymap, 2, 2)
       if next_key_index == 2 then
         hl_name = "hopper.hl.SecondKeyNext"
       else
         hl_name = "hopper.hl.SecondKey"
+      end
+    elseif idx == keymap_indexes[3] then
+      key = string.sub(keymap, 3, 3)
+      if next_key_index == 3 then
+        hl_name = "hopper.hl.ThirdKeyNext"
+      else
+        hl_name = "hopper.hl.ThirdKey"
+      end
+    elseif idx == keymap_indexes[4] then
+      key = string.sub(keymap, 4, 4)
+      if next_key_index == 4 then
+        hl_name = "hopper.hl.FourthKeyNext"
+      else
+        hl_name = "hopper.hl.FourthKey"
       end
     end
     table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})

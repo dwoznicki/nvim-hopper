@@ -292,7 +292,7 @@ function KeymapForm:_suggest_keymap()
   local datastore = require("hopper.db").datastore()
   local assigned_keymaps = utils.set(datastore:list_keymaps(self.project.name))
   local allowed_keys = utils.set(require("hopper.options").options().keymapping.keyset)
-  local suggested_keymap = keymaps.keymap_for_path(self.path, 4, allowed_keys, assigned_keymaps)
+  local suggested_keymap = keymaps.keymap_for_path(self.path, 4, self.keymap_length, allowed_keys, assigned_keymaps)
   self.suggested_keymap = suggested_keymap
   self:draw()
 end
