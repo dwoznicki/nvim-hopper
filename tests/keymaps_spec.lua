@@ -42,7 +42,7 @@ describe("keymaps", function()
   end)
 
   describe("#keymap_location_in_path", function()
-    it("should pick correct indexes (filename only)", function()
+    it("should pick correct indexes (just filename)", function()
       assert.same(
         {1, 2},
         keymaps.keymap_location_in_path("file.txt", "fi")
@@ -183,7 +183,7 @@ describe("keymaps", function()
         )
       )
     end)
-    it("should use characters from earlier path tokens when necessary #only", function()
+    it("should use characters from earlier path tokens when necessary", function()
       assert.same(
         "he",
         keymaps.keymap_for_path(
@@ -192,6 +192,77 @@ describe("keymaps", function()
           2,
           utils.set(keymaps.keysets.alphanumeric),
           utils.set({"wo", "wh", "we", "wl", "ow", "oh", "oe", "ol"})
+        )
+      )
+    end)
+    it("should repsect allowed keys", function()
+      assert.same(
+        "wl",
+        keymaps.keymap_for_path(
+          "/hello/world",
+          2,
+          2,
+          utils.set({"w", "r", "l"}),
+          utils.set({"wr"})
+        )
+      )
+    end)
+    it("should allow for 1 character long keymaps", function()
+      assert.same(
+        "r",
+        keymaps.keymap_for_path(
+          "/hello/world",
+          2,
+          1,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({"w", "o"})
+        )
+      )
+    end)
+    it("should allow for 3 character long keymaps", function()
+      assert.same(
+        "wor",
+        keymaps.keymap_for_path(
+          "/hello/world",
+          2,
+          3,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({})
+        )
+      )
+    end)
+    it("should allow repeated characters", function()
+      assert.same(
+        "ww",
+        keymaps.keymap_for_path(
+          "/wow",
+          2,
+          2,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({"wo"})
+        )
+      )
+    end)
+    it("should randomly pick characters to finish keymap", function()
+      assert.same(
+        "wa",
+        keymaps.keymap_for_path(
+          "/world",
+          2,
+          2,
+          utils.set({"a", "w", "o", "r", "l", "d"}),
+          utils.set({"wo", "wr", "wl", "wd", "ww", "or", "ol", "od", "ow", "rl", "rd", "rw", "ro", "ld", "lw", "lo", "lr", "dw", "do", "dr", "dl"})
+        )
+      )
+    end)
+    it("should just pick something at random when no valid keymaps found #only", function()
+      assert.is_not_nil(
+        keymaps.keymap_for_path(
+          "/wo",
+          2,
+          2,
+          utils.set(keymaps.keysets.alphanumeric),
+          utils.set({"wo", "ow", "ww", "oo"})
         )
       )
     end)
