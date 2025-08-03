@@ -6,7 +6,7 @@ local loop = vim.uv or vim.loop
 
 ---@alias hopper.HighlightLocation {name: string, row: integer, col_start: integer, col_end: integer}
 
----@alias hopper.KeymapFormValidationCode "keymap_conflict"
+---@alias hopper.KeymapFormValidationCode "keymap_conflict" | "keymap_will_be_deleted"
 
 ---@class hopper.KeymapFormValidation
 ---@field code hopper.KeymapFormValidationCode
@@ -18,6 +18,7 @@ local M = {}
 ---@field project hopper.Project | nil
 ---@field path string
 ---@field keymap string
+---@field existing_file hopper.FileMapping | nil
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer
@@ -50,6 +51,7 @@ function KeymapForm._reset(form)
   form.project = nil
   form.path = ""
   form.keymap = ""
+  form.existing_file = nil
   form.buf = -1
   form.win = -1
   form.win_width = -1
@@ -94,6 +96,7 @@ function KeymapForm:open(path, opts)
     existing_keymap = existing_file.keymap
   end
   self.keymap = existing_keymap or ""
+  self.existing_file = existing_file
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "prompt", {buf = buf})
@@ -214,7 +217,7 @@ function KeymapForm:draw_footer()
   local next_footer_win_height ---@type integer
   if self.validation ~= nil then
     local hl ---@type string
-    if self.validation.code == "keymap_conflict" then
+    if self.validation.code == "keymap_conflict" or self.validation.code == "keymap_will_be_deleted" then
       hl = "WarningMsg"
     else
       hl = "ErrorMsg"
@@ -237,7 +240,7 @@ function KeymapForm:draw_footer()
   end
 
   local help_line = {{"  "}} ---@type string[][]
-  if self:_keymap_ok() then
+  if self:_can_confirm() then
     table.insert(help_line, {"󰌑 ", "Function"})
     table.insert(help_line, {" Confirm"})
   else
@@ -270,11 +273,16 @@ function KeymapForm:draw_footer()
 end
 
 function KeymapForm:confirm()
-  if not self:_keymap_ok() then
+  if not self:_can_confirm() then
     return
   end
   local datastore = require("hopper.db").datastore()
-  datastore:set_file(self.project.name, self.path, self.keymap)
+  if self.existing_file ~= nil and string.len(self.keymap) == 0 then
+    -- User has cleared out an existing keymap and confirmed. Consider this a delete call.
+    datastore:remove_file(self.project.name, self.path)
+  else
+    datastore:set_file(self.project.name, self.path, self.keymap)
+  end
   vim.schedule(function()
     if self.on_keymap_set ~= nil then
       self.on_keymap_set(self)
@@ -298,12 +306,17 @@ function KeymapForm:_suggest_keymap()
 end
 
 function KeymapForm:validate()
-  local datastore = require("hopper.db").datastore()
-  local existing_mapping = datastore:get_file_by_keymap(self.project.name, self.keymap)
-  if existing_mapping ~= nil and existing_mapping.path ~= self.path then
+  if self.existing_file ~= nil and self.existing_file.path ~= self.path then
     self.validation = {
       code = "keymap_conflict",
-      message = string.format("Keymap \"%s\" is already in use for file \"%s\". Overwrite?", self.keymap, existing_mapping.path),
+      message = string.format("Keymap \"%s\" is already in use for file \"%s\". Overwrite?", self.keymap, self.existing_file.path),
+    }
+    return
+  end
+  if self.existing_file ~= nil and string.len(self.keymap) == 0 then
+    self.validation = {
+      code = "keymap_will_be_deleted",
+      message = "Remove this keymap?",
     }
     return
   end
@@ -316,6 +329,10 @@ function KeymapForm:accept_suggestion()
     return
   end
   vim.api.nvim_buf_set_lines(self.buf, 0, 1, false, {self.suggested_keymap})
+  if vim.api.nvim_get_mode().mode ~= "n" then
+    -- Set the cursor position to after the new keymap. It looks more natural.
+    vim.api.nvim_win_set_cursor(0, {1, string.len(self.suggested_keymap)})
+  end
   self:clear_suggestion()
 end
 
@@ -350,7 +367,7 @@ function KeymapForm:_attach_event_handlers()
       end
       self:draw()
 
-      if self:_keymap_ok() then
+      if self:_can_confirm() then
         vim.schedule(function()
           self:validate()
           self:draw()
@@ -379,7 +396,7 @@ function KeymapForm:_attach_event_handlers()
     {"i", "n"},
     "<cr>",
     function()
-      if self:_keymap_ok() then
+      if self:_can_confirm() then
         self:confirm()
         return ""
       end
@@ -455,7 +472,11 @@ function KeymapForm:_attach_event_handlers()
 end
 
 ---@return boolean
-function KeymapForm:_keymap_ok()
+function KeymapForm:_can_confirm()
+  if self.existing_file ~= nil and string.len(self.keymap) == 0 then
+    -- User is clearing out an existing keymap. Allow it to be deleted.
+    return true
+  end
   if string.len(self.keymap) < self.keymap_length then
     -- Keymap must have exactly specified number of characters.
     return false

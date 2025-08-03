@@ -1,37 +1,5 @@
 local M = {}
 
--- function _determine_significant_path_tokens()
---   ---@class TreeNode: table<string, TreeNode>
---   local reverse_path_token_tree = {}
---
---   for _, qfile in ipairs(self.files) do
---     local curr_node = reverse_path_token_tree
---     for i = #qfile.path_tokens, 1, -1 do
---       local path_token = qfile.path_tokens[i]
---       if curr_node[path_token] == nil then
---         curr_node[path_token] = {}
---       end
---       curr_node = curr_node[path_token]
---     end
---   end
---
---   for _, qfile in ipairs(self.files) do
---     local curr_node = reverse_path_token_tree
---     for j = #qfile.path_tokens, 1, -1 do
---       local path_token = qfile.path_tokens[j]
---       qfile.num_significant_path_tokens = qfile.num_significant_path_tokens + 1
---       local num_shared_path_tokens = 0
---       for _, _ in pairs(curr_node[path_token]) do
---         num_shared_path_tokens = num_shared_path_tokens + 1
---       end
---       if num_shared_path_tokens < 2 then
---         break
---       end
---       curr_node = curr_node[path_token]
---     end
---   end
--- end
-
 M.keysets = {
   ---@type string[]
   alpha = {

@@ -67,6 +67,10 @@ end
 -- Clamp buffer value to given number of characters and return result.
 -- Only one line is supported.
 function M.clamp_buffer_value_chars(buf, num_chars)
+  local line_count = vim.api.nvim_buf_line_count(buf)
+  if line_count > 1 then
+    vim.api.nvim_buf_set_lines(buf, 1, -1, false, {})
+  end
   local value = vim.api.nvim_buf_get_lines(buf, 0, -1, false)[1] or ""
   if num_chars ~= nil and string.len(value) > num_chars then
     value = value:sub(1, num_chars)

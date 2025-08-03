@@ -1,4 +1,5 @@
 local utils = require("hopper.utils")
+local keymaps = require("hopper.keymaps")
 
 local M = {}
 
@@ -18,10 +19,11 @@ local M = {}
 
 local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
-    keyset = {
-      "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-    },
-    length = 2,
+    -- keyset = {
+    --   "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+    -- },
+    keyset = keymaps.keysets.alphanumeric,
+    length = 3,
   },
 }
 

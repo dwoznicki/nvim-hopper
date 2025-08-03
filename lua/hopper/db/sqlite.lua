@@ -287,6 +287,7 @@ end
 ---@field insert_project_stmt hopper.PreparedStatement | nil
 ---@field update_project_stmt hopper.PreparedStatement | nil
 ---@field select_files_stmt hopper.PreparedStatement | nil
+---@field select_files_with_keymap_len_stmt hopper.PreparedStatement | nil
 ---@field select_keymaps_stmt hopper.PreparedStatement | nil
 ---@field select_file_id_by_path_stmt hopper.PreparedStatement | nil
 ---@field select_file_by_keymap_stmt hopper.PreparedStatement | nil
@@ -427,14 +428,25 @@ function SqlDatastore:set_project(name, path)
 end
 
 ---@param project string
+---@param keymap_length integer | nil Optionally filter by keymap length.
 ---@return hopper.FileMapping[]
-function SqlDatastore:list_files(project)
-  if self.select_files_stmt == nil then
-    self.select_files_stmt = PreparedStatement.new([[
-      SELECT id, project, path, keymap FROM file_mappings WHERE project = ? ORDER BY created
-    ]], self.conn)
+function SqlDatastore:list_files(project, keymap_length)
+  local results ---@type string[][]
+  if keymap_length == nil then
+    if self.select_files_stmt == nil then
+      self.select_files_stmt = PreparedStatement.new([[
+        SELECT id, project, path, keymap FROM file_mappings WHERE project = ? ORDER BY created
+      ]], self.conn)
+    end
+    results = self.select_files_stmt:exec_query({project})
+  else
+    if self.select_files_with_keymap_len_stmt == nil then
+      self.select_files_with_keymap_len_stmt = PreparedStatement.new([[
+        SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND length(keymap) = ? ORDER BY created
+      ]], self.conn)
+    end
+    results = self.select_files_with_keymap_len_stmt:exec_query({project, keymap_length})
   end
-  local results = self.select_files_stmt:exec_query({project})
   local files = {} ---@type hopper.FileMapping[]
   for _, result in ipairs(results) do
     table.insert(files, {

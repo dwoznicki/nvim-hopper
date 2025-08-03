@@ -70,7 +70,7 @@ function MainFloat:open(opts)
   self.win_width = win_width
 
   local datastore = require("hopper.db").datastore()
-  local files = datastore:list_files(self.project.name)
+  local files = datastore:list_files(self.project.name, self.keymap_length)
   self:_set_files(files)
 
   local buf = vim.api.nvim_create_buf(false, true)
@@ -169,14 +169,14 @@ function MainFloat:draw_footer()
   local curr_mode = vim.api.nvim_get_mode().mode
   if curr_mode == "n" then
     table.insert(help_line, {"K", "Function"})
-    table.insert(help_line, {" New keymap"})
+    table.insert(help_line, {" Keymap"})
     table.insert(help_line, {"  "})
     table.insert(help_line, {"p", "Function"})
-    table.insert(help_line, {" Project menu"})
+    table.insert(help_line, {" Project"})
   else
-    table.insert(help_line, {"K New keymap", "Comment"})
+    table.insert(help_line, {"K Keymap", "Comment"})
     table.insert(help_line, {"  "})
-    table.insert(help_line, {"p Project menu", "Comment"})
+    table.insert(help_line, {"p Project", "Comment"})
   end
   vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_text = help_line,
@@ -274,7 +274,9 @@ function MainFloat:_attach_event_handlers()
           if item.path then
             table.insert(filtered_files, item)
           else
-            table.insert(stack, item)
+            for _, child in pairs(item) do
+              table.insert(stack, child)
+            end
           end
         end
         self.filtered_files = filtered_files
