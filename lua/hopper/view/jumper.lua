@@ -314,7 +314,7 @@ function MainFloat:_attach_event_handlers()
       --   prior_buf = self.prior_buf,
       -- }
       local reopen_main = self:_new_reopen_callback()
-      require("hopper.view.keymap_ui").form():open(
+      require("hopper.view.keymapper").form():open(
         path,
         {
           project = self.project,

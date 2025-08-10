@@ -2,11 +2,11 @@ local projects = require("hopper.projects")
 
 local M = {}
 
-function M.toggle_keymap_view()
+function M.toggle_keymapper()
   local project = projects.current_project()
   local file_path = vim.api.nvim_buf_get_name(0)
   local path = projects.path_from_project_root(project.path, file_path)
-  local float = require("hopper.view.keymap_ui").form()
+  local float = require("hopper.view.keymapper").form()
   if float.is_open then
     float:close()
   else
@@ -14,8 +14,8 @@ function M.toggle_keymap_view()
   end
 end
 
-function M.toggle_view()
-  local float = require("hopper.view.main").float()
+function M.toggle_jumper()
+  local float = require("hopper.view.jumper").float()
   if float.is_open then
     float:close()
   else
@@ -23,7 +23,7 @@ function M.toggle_view()
   end
 end
 
-function M.toggle_info_view()
+function M.toggle_info()
   local overlay = require("hopper.view.info").overlay()
   if overlay.is_open then
     overlay:close()
@@ -35,7 +35,7 @@ end
 ---@param name string
 ---@param path string
 ---@return hopper.Project
-function M.set_project(name, path)
+function M.create_project(name, path)
   local datastore = require("hopper.db").datastore()
   datastore:set_project(name, path)
   return {
@@ -50,14 +50,14 @@ function M.remove_project(name)
   datastore:remove_project(name)
 end
 
----@class hopper.SetKeymapOptions
+---@class hopper.CreateKeymapOptions
 ---@field project hopper.Project | string | nil
 
 ---@param path string
 ---@param keymap string
----@param opts? hopper.SetKeymapOptions
+---@param opts? hopper.CreateKeymapOptions
 ---@return hopper.FileMapping
-function M.set_keymap(keymap, path, opts)
+function M.create_keymap(keymap, path, opts)
   opts = opts or {}
   local project ---@type hopper.Project
   if opts.project then
