@@ -2,17 +2,6 @@
 
 local M = {}
 
----@param win integer
----@param buffers BufhopperBuffer[]
----@return BufhopperBuffer | nil, integer
-function M.get_buf_key_under_cursor(win, buffers)
-  local cursor_pos = vim.api.nvim_win_get_cursor(win)
-  local buffer_idx = cursor_pos[1]
-  ---@type BufhopperBuffer | nil
-  local buf_key = buffers[buffer_idx]
-  return buf_key, buffer_idx
-end
-
 ---@return integer width, integer height
 function M.get_win_dimensions()
   local ui = vim.api.nvim_list_uis()[1]

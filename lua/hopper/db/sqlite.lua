@@ -94,7 +94,7 @@ end
 
 local M = {}
 
-M.DEFAULT_DB_PATH = "/tmp/hopper.db"
+M.DEFAULT_DB_PATH = vim.fn.stdpath("data") .. "/hopper/hopper.db"
 
 ---@class hopper.Connection
 ---@field sqlite_conn ffi.cdata*
@@ -286,6 +286,7 @@ end
 ---@field create_file_mappings_project_idx_stmt hopper.PreparedStatement | nil
 ---@field insert_project_stmt hopper.PreparedStatement | nil
 ---@field update_project_stmt hopper.PreparedStatement | nil
+---@field delete_project_stmt hopper.PreparedStatement | nil
 ---@field select_files_stmt hopper.PreparedStatement | nil
 ---@field select_files_with_keymap_len_stmt hopper.PreparedStatement | nil
 ---@field select_keymaps_stmt hopper.PreparedStatement | nil
@@ -295,6 +296,7 @@ end
 ---@field insert_file_stmt hopper.PreparedStatement | nil
 ---@field update_file_stmt hopper.PreparedStatement | nil
 ---@field delete_file_stmt hopper.PreparedStatement | nil
+---@field delete_files_for_project_stmt hopper.PreparedStatement | nil
 local SqlDatastore = {}
 SqlDatastore.__index = SqlDatastore
 M.SqlDatastore = SqlDatastore
@@ -425,6 +427,22 @@ function SqlDatastore:set_project(name, path)
     end
     self.update_project_stmt:exec_update({path, name})
   end
+end
+
+---@param name string
+function SqlDatastore:remove_project(name)
+  if self.delete_project_stmt == nil then
+    self.delete_project_stmt = PreparedStatement.new([[
+      DELETE FROM projects WHERE name = ?
+    ]], self.conn)
+  end
+  self.delete_project_stmt:exec_update({name})
+  if self.delete_files_for_project_stmt == nil then
+    self.delete_files_for_project_stmt = PreparedStatement.new([[
+      DELETE FROM file_mappings WHERE project = ?
+    ]], self.conn)
+  end
+  self.delete_files_for_project_stmt:exec_update({name})
 end
 
 ---@param project string
