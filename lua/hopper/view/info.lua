@@ -95,10 +95,10 @@ function InfoOverlay:open(opts)
   self.win = win
   self.footer_buf = footer_buf
   self.footer_win = footer_win
+  self.is_open = true
 
   self:_attach_event_handlers()
 
-  self.is_open = true
   self:init()
 end
 

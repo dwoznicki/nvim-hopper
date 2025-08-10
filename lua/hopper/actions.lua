@@ -7,12 +7,20 @@ function M.toggle_keymap_view()
   local file_path = vim.api.nvim_buf_get_name(0)
   local path = projects.path_from_project_root(project.path, file_path)
   local float = require("hopper.view.keymap_ui").form()
-  float:open(path)
+  if float.is_open then
+    float:close()
+  else
+    float:open(path)
+  end
 end
 
 function M.toggle_view()
   local float = require("hopper.view.main").float()
-  float:open()
+  if float.is_open then
+    float:close()
+  else
+    float:open()
+  end
 end
 
 function M.toggle_info_view()
@@ -42,12 +50,12 @@ function M.remove_project(name)
   datastore:remove_project(name)
 end
 
----@class hopper.NewKeymapOptions
+---@class hopper.SetKeymapOptions
 ---@field project hopper.Project | string | nil
 
 ---@param path string
 ---@param keymap string
----@param opts? hopper.NewKeymapOptions
+---@param opts? hopper.SetKeymapOptions
 ---@return hopper.FileMapping
 function M.set_keymap(keymap, path, opts)
   opts = opts or {}
@@ -64,6 +72,23 @@ function M.set_keymap(keymap, path, opts)
     error("Unable to find file mapping.")
   end
   return file
+end
+
+---@class hopper.RemoveKeymapOptions
+---@field project hopper.Project | string | nil
+
+---@param path string
+---@param opts? hopper.RemoveKeymapOptions
+function M.remove_keymap(path, opts)
+  opts = opts or {}
+  local project ---@type hopper.Project
+  if opts.project then
+    project = projects.resolve_project(opts.project)
+  else
+    project = projects.current_project()
+  end
+  local datastore = require("hopper.db").datastore()
+  datastore:remove_file(project.name, path)
 end
 
 return M

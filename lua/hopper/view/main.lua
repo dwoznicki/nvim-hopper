@@ -10,6 +10,7 @@ local M = {}
 ---@class hopper.MainFloat
 ---@field project hopper.Project | nil
 ---@field files hopper.FileMapping[]
+---@field is_open boolean
 ---@field keymap_file_tree hopper.KeymapFileTree
 ---@field filtered_files hopper.FileMapping[]
 ---@field buf integer
@@ -38,6 +39,7 @@ end
 function MainFloat._reset(float)
   float.project = nil
   float.files = {}
+  float.is_open = false
   float.keymap_file_tree = {}
   float.filtered_files = {}
   float.buf = -1
@@ -121,12 +123,12 @@ function MainFloat:open(opts)
     zindex = 51, -- Just enough to site on top of the main window.
   }
   local footer_win = vim.api.nvim_open_win(footer_buf, false, footer_win_config)
-  -- vim.api.nvim_set_option_value("winhighlight", "Normal:hopper.hl.FloatFooter", {win = footer_win})
 
   self.buf = buf
   self.win = win
   self.footer_buf = footer_buf
   self.footer_win = footer_win
+  self.is_open = true
 
   self:_attach_event_handlers()
 

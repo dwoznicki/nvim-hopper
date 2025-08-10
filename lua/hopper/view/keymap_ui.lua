@@ -18,6 +18,7 @@ local M = {}
 ---@field project hopper.Project | nil
 ---@field path string
 ---@field keymap string
+---@field is_open boolean
 ---@field existing_file hopper.FileMapping | nil
 ---@field buf integer
 ---@field win integer
@@ -52,6 +53,7 @@ function KeymapForm._reset(form)
   form.path = ""
   form.keymap = ""
   form.existing_file = nil
+  form.is_open = false
   form.buf = -1
   form.win = -1
   form.win_width = -1
@@ -156,6 +158,7 @@ function KeymapForm:open(path, opts)
   self.win = win
   self.footer_buf = footer_buf
   self.footer_win = footer_win
+  self.is_open = true
 
   self:_attach_event_handlers()
 
