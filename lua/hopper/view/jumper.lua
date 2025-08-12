@@ -20,6 +20,7 @@ local M = {}
 ---@field footer_win integer
 ---@field prior_buf integer
 ---@field keymap_length integer
+---@field open_cmd string | nil
 local MainFloat = {}
 MainFloat.__index = MainFloat
 M.MainFloat = MainFloat
@@ -49,23 +50,25 @@ function MainFloat._reset(float)
   float.footer_win = -1
   float.prior_buf = -1
   float.keymap_length = -1
+  float.open_cmd = nil
 end
 
 ---@class hopper.OpenMainFloatOptions
 ---@field project hopper.Project | string | nil
 ---@field prior_buf integer | nil
 ---@field keymap_length integer | nil
+---@field open_cmd string | nil
 
 ---@param opts? hopper.OpenMainFloatOptions
 function MainFloat:open(opts)
   opts = opts or {}
-  if opts.project then
-    self.project = projects.resolve_project(opts.project)
-  else
-    self.project = projects.current_project()
-  end
+  self.project = projects.ensure_project(opts.project)
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
   self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
+  self.open_cmd = opts.open_cmd or require("hopper.options").options().keymapping.open_cmd
+  if self.open_cmd ~= nil and string.len(self.open_cmd) < 1 then
+    vim.notify_once(string.format('Open command "%s" is invalid.', self.open_cmd), vim.log.levels.WARN)
+  end
 
   local ui = vim.api.nvim_list_uis()[1]
   local win_width, win_height = utils.get_win_dimensions()
@@ -253,7 +256,6 @@ function MainFloat:_attach_event_handlers()
       local value = utils.clamp_buffer_value_chars(buf, self.keymap_length)
       -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
-      vim.print(value)
       if string.len(value) < 1 then
         self.filtered_files = self.files
         self:draw()
@@ -265,9 +267,12 @@ function MainFloat:_attach_event_handlers()
         self:draw()
         return
       end
-      if selected.path then
+      if selected.path ~= nil then
         vim.print(selected)
-        self:draw()
+        local path = selected.path ---@type string
+        -- self:close()
+        utils.open_or_focus_file(path, {open_cmd = self.open_cmd})
+        -- self:draw()
       else
         local filtered_files = {} ---@type hopper.FileMapping[]
         local stack = vim.tbl_values(selected) ---@type (hopper.FileMapping | hopper.KeymapFileNode)[]

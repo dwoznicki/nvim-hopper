@@ -27,10 +27,6 @@ local SQLITE_STATIC = ffi.cast("sqlite3_destructor_type", 0)
 local SQLITE_TRANSIENT = ffi.cast("sqlite3_destructor_type", -1)
 
 local function sqlite3_lib()
-  -- local opts = Snacks.picker.config.get()
-  -- if opts.db.sqlite3_path then
-  --   return opts.db.sqlite3_path
-  -- end
   if jit.os ~= "Windows" then
     return "sqlite3"
   end
@@ -94,7 +90,13 @@ end
 
 local M = {}
 
+-- Probably `~/.local/share/nvim/hopper/hopper.db`.
 M.DEFAULT_DB_PATH = vim.fn.stdpath("data") .. "/hopper/hopper.db"
+if jit.os ~= "Windows" then
+  M.DEFAULT_SQLITE_PATH = "sqlite3"
+else
+  M.DEFAULT_SQLITE_PATH = vim.fn.stdpath("cache") .. "\\sqlite3.dll"
+end
 
 ---@class hopper.Connection
 ---@field sqlite_conn ffi.cdata*
@@ -304,6 +306,8 @@ M.SqlDatastore = SqlDatastore
 ---@param path string
 function SqlDatastore.new(path)
   local datastore = setmetatable({}, SqlDatastore)
+  -- Create the data directory if it doesn't exist.
+  vim.fn.mkdir(vim.fs.dirname(path), "p")
   local conn = Connection.new(path)
   datastore.conn = conn
   return datastore

@@ -120,4 +120,43 @@ function M.is_integer(value)
   return type(value) == "number" and math.floor(value) == value
 end
 
+---@class hopper.OpenOrFofucsFileOptions
+---@field open_cmd string | nil
+
+---@param path string
+---@param opts? hopper.OpenOrFofucsFileOptions
+---@return integer buf
+function M.open_or_focus_file(path, opts)
+  opts = opts or {}
+  local open_cmd = opts.open_cmd or "edit"
+  local abs_path = vim.fn.fnamemodify(path, ":p")
+  local buf = vim.fn.bufnr(abs_path)
+
+  if buf == -1 then
+    -- Not in buflist yet. Open new buffer.
+    vim.print("buf " .. buf)
+    vim.print(string.format("%s %s", open_cmd, vim.fn.fnameescape(abs_path)))
+    vim.cmd(string.format("%s %s", open_cmd, vim.fn.fnameescape(abs_path)))
+    return vim.api.nvim_get_current_buf()
+  end
+
+  -- Buffer exists. If a window already shows it, jump there.
+  local wins = vim.fn.win_findbuf(buf)
+  if #wins > 0 then
+    vim.print("found wins")
+    vim.print(wins)
+    vim.api.nvim_set_current_win(wins[1])
+    return buf
+  end
+
+  -- Otherwise, show it in current window (or a new split/tab).
+  if open_cmd ~= "edit" then
+    vim.print("weird command " .. open_cmd)
+    vim.cmd(open_cmd)
+  end
+  vim.print("weird buf " .. buf)
+  vim.api.nvim_set_current_buf(buf)
+  return buf
+end
+
 return M

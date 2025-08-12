@@ -76,11 +76,7 @@ end
 ---@param opts? hopper.KeymapFormOpenOptions
 function KeymapForm:open(path, opts)
   opts = opts or {}
-  if opts.project then
-    self.project = projects.resolve_project(opts.project)
-  else
-    self.project = projects.current_project()
-  end
+  self.project = projects.ensure_project(opts.project)
   self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
   self.on_keymap_set = opts.on_keymap_set
   self.on_back = opts.on_back

@@ -5,22 +5,39 @@ local M = {}
 
 ---@class hopper.Options
 ---@field keymapping hopper.KeymappingOptions | nil
+---@field db hopper.DatabaseOptions | nil
 
 ---@class hopper.KeymappingOptions
 ---@field keyset string | string[] | nil
 ---@field length integer | nil
+---@field open_cmd string | nil "edit", "split", "vsplit"
+
+---@class hopper.DatabaseOptions
+---@field sqlite_path string | nil
+---@field database_path string | nil
 
 ---@class hopper.ResolvedOptions
 ---@field keymapping hopper.ResolvedKeymappingOptions
+---@field db hopper.ResolvedDatabaseOptions
 
 ---@class hopper.ResolvedKeymappingOptions
 ---@field keyset string[]
 ---@field length integer
+---@field open_cmd string
+
+---@class hopper.ResolvedDatabaseOptions
+---@field sqlite_path string
+---@field database_path string
 
 local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
     keyset = keymaps.keysets.alphanumeric,
     length = 2,
+    open_cmd = "edit",
+  },
+  db = {
+    sqlite_path = require("hopper.db.sqlite").DEFAULT_SQLITE_PATH,
+    database_path = require("hopper.db.sqlite").DEFAULT_DB_PATH,
   },
 }
 
@@ -80,7 +97,7 @@ end
 function M.set_options(opts)
   opts = opts or {}
   normalize_and_validate_options(opts)
-  _options = vim.tbl_deep_extend("force", {}, opts, _default_options) ---@type hopper.ResolvedOptions
+  _options = vim.tbl_deep_extend("force", {}, _default_options, opts) ---@type hopper.ResolvedOptions
 end
 
 ---@return hopper.ResolvedOptions

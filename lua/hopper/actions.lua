@@ -1,3 +1,4 @@
+local utils = require("hopper.utils")
 local projects = require("hopper.projects")
 
 local M = {}
@@ -32,6 +33,25 @@ function M.toggle_info()
   end
 end
 
+---@class hopper.JumpToFileOptions
+---@field project hopper.Project | string | nil
+---@field open_cmd string | nil
+
+---@param keymap string
+---@param opts? hopper.JumpToFileOptions
+function M.jump_to_file(keymap, opts)
+  opts = opts or {}
+  local project = projects.ensure_project(opts.project)
+  local datastore = require("hopper.db").datastore()
+  local file = datastore:get_file_by_keymap(project.name, keymap)
+  if file == nil then
+    vim.notify(string.format('Unable to find file for keymap "%s" in project "%s".', keymap, project), vim.log.levels.WARN)
+    return
+  end
+  local file_path = projects.path_from_project_root(project.path, file.path)
+  utils.open_or_focus_file(file_path, {open_cmd = opts.open_cmd})
+end
+
 ---@param name string
 ---@param path string
 ---@return hopper.Project
@@ -59,12 +79,7 @@ end
 ---@return hopper.FileMapping
 function M.create_keymap(keymap, path, opts)
   opts = opts or {}
-  local project ---@type hopper.Project
-  if opts.project then
-    project = projects.resolve_project(opts.project)
-  else
-    project = projects.current_project()
-  end
+  local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
   datastore:set_file(project.name, path, keymap)
   local file = datastore:get_file_by_path(project.name, path)
@@ -81,12 +96,7 @@ end
 ---@param opts? hopper.RemoveKeymapOptions
 function M.remove_keymap(path, opts)
   opts = opts or {}
-  local project ---@type hopper.Project
-  if opts.project then
-    project = projects.resolve_project(opts.project)
-  else
-    project = projects.current_project()
-  end
+  local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
   datastore:remove_file(project.name, path)
 end
