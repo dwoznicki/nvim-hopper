@@ -65,7 +65,7 @@ function MainFloat:open(opts)
   self.project = projects.ensure_project(opts.project)
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
   self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
-  self.open_cmd = opts.open_cmd or require("hopper.options").options().keymapping.open_cmd
+  self.open_cmd = opts.open_cmd or require("hopper.options").options().keymapping.default_open_cmd
   if self.open_cmd ~= nil and string.len(self.open_cmd) < 1 then
     vim.notify_once(string.format('Open command "%s" is invalid.', self.open_cmd), vim.log.levels.WARN)
   end
@@ -226,6 +226,9 @@ function MainFloat:_new_reopen_callback(opts)
 end
 
 ---@param files hopper.FileMapping[]
+-- Set the list of files, including building out a tree of keymaps to file paths. This tree is
+-- important when determining whether a file keymapping has been activated during the text change
+-- handler.
 function MainFloat:_set_files(files)
   local tree = {} ---@type hopper.KeymapFileTree
   for _, file in ipairs(files) do
@@ -257,23 +260,51 @@ function MainFloat:_attach_event_handlers()
       -- Clear the `modified` flag for prompt so we can close without saving.
       vim.bo[buf].modified = false
       if string.len(value) < 1 then
+        -- All input text has been deleted. Reset the filtered files list back to its default value
+        -- and bail.
         self.filtered_files = self.files
         self:draw()
         return
       end
+      -- The `keymap_file_tree` is a nested table. Leaf nodes are file mappings, and interim nodes
+      -- are single characters in a keymap. For example, it might look something like
+      --
+      -- {
+      --   i = {
+      --     l = {
+      --       path = "~/init.lua",
+      --     },
+      --     v = {
+      --       path = "~/init.vim",
+      --     },
+      --   },
+      -- }
+      --
+      -- In this case, we'd expect the selected value for input "i" to be the table containing keys
+      -- "l" and "v". The selected value for input "iv" would be the "init.vim" file mapping object.
       local selected = vim.tbl_get(self.keymap_file_tree, unpack(vim.split(value, ""))) ---@type hopper.FileMapping | hopper.KeymapFileTree | nil
       if selected == nil then
+        -- No selection found. Empty out the list and bail.
         self.filtered_files = {}
         self:draw()
         return
       end
       if selected.path ~= nil then
+        -- The selected object is a valid file. Open it.
         vim.print(selected)
         local path = selected.path ---@type string
-        -- self:close()
-        utils.open_or_focus_file(path, {open_cmd = self.open_cmd})
-        -- self:draw()
+        local open_cmd = self.open_cmd
+        self:close()
+        -- Need to defer the new file load so that this float can properly finish closing before
+        -- attempting to render the file. Failing to do so results in the new buffer only being
+        -- partially initialized.
+        vim.schedule(function()
+          utils.open_or_focus_file(path, {open_cmd = open_cmd})
+        end)
       else
+        -- The selected object is another set of poossible next characters in the keymap.
+        -- Filter the visible list down to only files that are possible to select from this keymap
+        -- so far.
         local filtered_files = {} ---@type hopper.FileMapping[]
         local stack = vim.tbl_values(selected) ---@type (hopper.FileMapping | hopper.KeymapFileNode)[]
         while #stack > 0 do
@@ -314,10 +345,6 @@ function MainFloat:_attach_event_handlers()
     "K",
     function()
       local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
-      -- local options = {
-      --   project = self.project,
-      --   prior_buf = self.prior_buf,
-      -- }
       local reopen_main = self:_new_reopen_callback()
       require("hopper.view.keymapper").form():open(
         path,

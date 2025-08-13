@@ -134,8 +134,6 @@ function M.open_or_focus_file(path, opts)
 
   if buf == -1 then
     -- Not in buflist yet. Open new buffer.
-    vim.print("buf " .. buf)
-    vim.print(string.format("%s %s", open_cmd, vim.fn.fnameescape(abs_path)))
     vim.cmd(string.format("%s %s", open_cmd, vim.fn.fnameescape(abs_path)))
     return vim.api.nvim_get_current_buf()
   end
@@ -143,18 +141,14 @@ function M.open_or_focus_file(path, opts)
   -- Buffer exists. If a window already shows it, jump there.
   local wins = vim.fn.win_findbuf(buf)
   if #wins > 0 then
-    vim.print("found wins")
-    vim.print(wins)
     vim.api.nvim_set_current_win(wins[1])
     return buf
   end
 
   -- Otherwise, show it in current window (or a new split/tab).
   if open_cmd ~= "edit" then
-    vim.print("weird command " .. open_cmd)
     vim.cmd(open_cmd)
   end
-  vim.print("weird buf " .. buf)
   vim.api.nvim_set_current_buf(buf)
   return buf
 end

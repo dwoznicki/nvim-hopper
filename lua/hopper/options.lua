@@ -10,7 +10,7 @@ local M = {}
 ---@class hopper.KeymappingOptions
 ---@field keyset string | string[] | nil
 ---@field length integer | nil
----@field open_cmd string | nil "edit", "split", "vsplit"
+---@field default_open_cmd string | nil "edit", "split", "vsplit"
 
 ---@class hopper.DatabaseOptions
 ---@field sqlite_path string | nil
@@ -23,7 +23,7 @@ local M = {}
 ---@class hopper.ResolvedKeymappingOptions
 ---@field keyset string[]
 ---@field length integer
----@field open_cmd string
+---@field default_open_cmd string
 
 ---@class hopper.ResolvedDatabaseOptions
 ---@field sqlite_path string
@@ -33,7 +33,7 @@ local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
     keyset = keymaps.keysets.alphanumeric,
     length = 2,
-    open_cmd = "edit",
+    default_open_cmd = "split",
   },
   db = {
     sqlite_path = require("hopper.db.sqlite").DEFAULT_SQLITE_PATH,

@@ -101,7 +101,7 @@ function KeymapForm:open(path, opts)
   vim.api.nvim_set_option_value("bufhidden", "wipe", {buf = buf})
   vim.api.nvim_set_option_value("swapfile", false, {buf = buf})
   vim.api.nvim_set_option_value("buflisted", false, {buf = buf})
-  vim.api.nvim_set_option_value("filetype", "HopperFloat", {buf = buf})
+  vim.api.nvim_set_option_value("filetype", "hopperfloat", {buf = buf})
   ---@type vim.api.keyset.win_config
   local win_config = {
     style = "minimal",
