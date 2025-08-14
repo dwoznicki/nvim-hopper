@@ -153,4 +153,31 @@ function M.open_or_focus_file(path, opts)
   return buf
 end
 
+---@class hopper.AttachCloseEventsOptions
+---@field buffer integer
+---@field on_close fun()
+---@field keypress_events string[]
+---@field vim_change_events string[]
+
+---@param opts hopper.AttachCloseEventsOptions
+function M.attach_close_events(opts)
+  for _, key in ipairs(opts.keypress_events) do
+    vim.keymap.set(
+      "n",
+      key,
+      opts.on_close,
+      {noremap = true, silent = true, nowait = true, buffer = opts.buffer}
+    )
+  end
+
+  vim.api.nvim_create_autocmd(opts.vim_change_events, {
+    buffer = opts.buffer,
+    once = true,
+    callback = function()
+      vim.schedule(opts.on_close)
+    end,
+  })
+
+end
+
 return M

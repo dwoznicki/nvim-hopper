@@ -441,32 +441,43 @@ function KeymapForm:_attach_event_handlers()
     )
   end
 
-  -- Close on q keypress.
-  vim.keymap.set(
-    "n",
-    "q",
-    function()
-      self:close()
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
-  -- Close on esc keypress.
-  vim.keymap.set(
-    "n",
-    "<esc>",
-    function()
-      self:close()
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
-  vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
+  -- -- Close on q keypress.
+  -- vim.keymap.set(
+  --   "n",
+  --   "q",
+  --   function()
+  --     self:close()
+  --   end,
+  --   {noremap = true, silent = true, nowait = true, buffer = buf}
+  -- )
+
+  -- -- Close on esc keypress.
+  -- vim.keymap.set(
+  --   "n",
+  --   "<esc>",
+  --   function()
+  --     self:close()
+  --   end,
+  --   {noremap = true, silent = true, nowait = true, buffer = buf}
+  -- )
+
+  -- vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
+  --   buffer = buf,
+  --   once = true,
+  --   callback = function()
+  --     vim.schedule(function()
+  --       self:close()
+  --     end)
+  --   end,
+  -- })
+
+  utils.attach_close_events({
     buffer = buf,
-    once = true,
-    callback = function()
-      vim.schedule(function()
-        self:close()
-      end)
+    on_close = function()
+      self:close()
     end,
+    keypress_events = {"<esc>", "q"},
+    vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end
 

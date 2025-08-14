@@ -330,15 +330,16 @@ function MainFloat:_attach_event_handlers()
     end,
   })
 
-  -- Close on esc keypress.
-  vim.keymap.set(
-    "n",
-    "<esc>",
-    function()
-      self:close()
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
+  -- vim.api.nvim_create_autocmd({"WinLeave", "BufWipeout"}, {
+  --   buffer = buf,
+  --   once = true,
+  --   callback = function()
+  --     vim.schedule(function()
+  --       self:close()
+  --     end)
+  --   end,
+  -- })
+
   -- Open new keymap view on K keypress.
   vim.keymap.set(
     "n",
@@ -371,14 +372,13 @@ function MainFloat:_attach_event_handlers()
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
 
-  vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
+  utils.attach_close_events({
     buffer = buf,
-    once = true,
-    callback = function()
-      vim.schedule(function()
-        self:close()
-      end)
+    on_close = function()
+      self:close()
     end,
+    keypress_events = {"<esc>"},
+    vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end
 
