@@ -382,14 +382,6 @@ function KeymapForm:_attach_event_handlers()
     end,
   })
 
-  -- vim.keymap.set(
-  --   {"i", "n"},
-  --   "<cr>",
-  --   function()
-  --     self:confirm()
-  --   end,
-  --   {noremap = true, silent = true, nowait = true, buffer = buf}
-  -- )
   -- Confirm new project on enter keypress.
   vim.keymap.set(
     {"i", "n"},
@@ -404,15 +396,7 @@ function KeymapForm:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
   )
-  -- -- Fill keymap suggestion on tab keypress.
-  -- vim.keymap.set(
-  --   {"i", "n"},
-  --   "<tab>",
-  --   function()
-  --     self:suggest_keymap()
-  --   end,
-  --   {noremap = true, silent = true, nowait = true, buffer = buf}
-  -- )
+
   -- Accept suggestion on tab keypress.
   vim.keymap.set(
     {"i", "n"},
@@ -440,36 +424,6 @@ function KeymapForm:_attach_event_handlers()
       {noremap = true, silent = true, nowait = true, buffer = buf}
     )
   end
-
-  -- -- Close on q keypress.
-  -- vim.keymap.set(
-  --   "n",
-  --   "q",
-  --   function()
-  --     self:close()
-  --   end,
-  --   {noremap = true, silent = true, nowait = true, buffer = buf}
-  -- )
-
-  -- -- Close on esc keypress.
-  -- vim.keymap.set(
-  --   "n",
-  --   "<esc>",
-  --   function()
-  --     self:close()
-  --   end,
-  --   {noremap = true, silent = true, nowait = true, buffer = buf}
-  -- )
-
-  -- vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
-  --   buffer = buf,
-  --   once = true,
-  --   callback = function()
-  --     vim.schedule(function()
-  --       self:close()
-  --     end)
-  --   end,
-  -- })
 
   utils.attach_close_events({
     buffer = buf,

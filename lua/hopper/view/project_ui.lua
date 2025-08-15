@@ -328,6 +328,7 @@ function NewProjectForm:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
   )
+
   -- Accept suggestion on tab keypress.
   vim.keymap.set(
     {"i", "n"},
@@ -344,40 +345,18 @@ function NewProjectForm:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
   )
-  -- Cancel on q keypress.
-  vim.keymap.set(
-    "n",
-    "q",
-    function()
-      if self.on_cancel ~= nil then
-        self.on_cancel(self)
-      else
-        self:close()
-      end
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
-  -- Close on escape keypress.
-  vim.keymap.set(
-    "n",
-    "<esc>",
-    function()
-      if self.on_cancel ~= nil then
-        self.on_cancel(self)
-      else
-        self:close()
-      end
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
-  vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
+
+  utils.attach_close_events({
     buffer = buf,
-    once = true,
-    callback = function()
-      vim.schedule(function()
+    on_close = function()
+      if self.on_cancel ~= nil then
+        self.on_cancel(self)
+      else
         self:close()
-      end)
+      end
     end,
+    keypress_events = {"q", "<esc>"},
+    vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end
 

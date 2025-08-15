@@ -1,8 +1,6 @@
 local utils = require("hopper.utils")
 local projects = require("hopper.projects")
 
-local footer_ns_id = vim.api.nvim_create_namespace("hopper.AvailableKeymapsFooter")
-
 local M = {}
 
 ---@class hopper.InfoOverlay
@@ -16,6 +14,8 @@ local M = {}
 local InfoOverlay = {}
 InfoOverlay.__index = InfoOverlay
 M.InfoOverlay = InfoOverlay
+
+InfoOverlay.footer_ns = vim.api.nvim_create_namespace("hopper.InfoOverlayFooter")
 
 ---@return hopper.InfoOverlay
 function InfoOverlay._new()
@@ -106,8 +106,8 @@ function InfoOverlay:init()
   ---@param available integer
   ---@param total integer
   local function draw_progress(checked, available, total)
-    vim.api.nvim_buf_clear_namespace(footer_buf, footer_ns_id, 0, 1)
-    vim.api.nvim_buf_set_extmark(footer_buf, footer_ns_id, 0, 0, {
+    vim.api.nvim_buf_clear_namespace(footer_buf, self.footer_ns, 0, 1)
+    vim.api.nvim_buf_set_extmark(footer_buf, self.footer_ns, 0, 0, {
       virt_text = {
         {string.format("%d/%d checked, %d available", checked, total, available), "Normal"},
       },
@@ -168,7 +168,6 @@ function InfoOverlay:init()
         "## Available keymaps",
         unpack(available_keymaps),
       })
-      -- vim.api.nvim_buf_set_lines(buf, 2, -1, false, available_keymaps)
       vim.api.nvim_set_option_value("modifiable", false, {buf = buf})
     end)
   end)
@@ -187,24 +186,13 @@ end
 function InfoOverlay:_attach_event_handlers()
   local buf = self.buf
 
-  -- Close on "q" keypress.
-  vim.keymap.set(
-    "n",
-    "q",
-    function()
+  utils.attach_close_events({
+    buffer = buf,
+    on_close = function()
       self:close()
     end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
-
-  vim.api.nvim_create_autocmd({"BufWinLeave", "WinLeave"}, {
-    buffer = buf,
-    once = true,
-    callback = function()
-      vim.schedule(function()
-        self:close()
-      end)
-    end,
+    keypress_events = {"q"},
+    vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end
 
