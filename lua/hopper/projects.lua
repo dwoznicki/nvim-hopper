@@ -124,16 +124,21 @@ function M.path_from_project_root(project_path, file_path)
   if not vim.startswith(file_path, project_path) then
     error(string.format("File %s is not part of the current project %s.", file_path, project_path))
   end
-  local start_idx = string.len(project_path)
-  if vim.startswith(project_path, "/") then
-    -- Remove leading "/" from path.
-    start_idx = start_idx + 1
+  local start_idx = string.len(project_path) + 1
+  local relative_path = string.sub(file_path, start_idx)
+  if vim.startswith(relative_path, "/") then
+    relative_path = string.sub(relative_path, 2)
   end
-  if string.len(project_path) > 1 then
-    -- Remove separating "/", but only if it's not the same character as the leading "/".
-    start_idx = start_idx + 1
-  end
-  return string.sub(file_path, start_idx)
+  return relative_path
+  -- if vim.endswith(project_path, "/") then
+  --   -- Remove trailing "/" from path.
+  --   start_idx = start_idx + 1
+  -- end
+  -- if string.len(project_path) > 1 then
+  --   -- Remove separating "/", but only if it's not the same character as the leading "/".
+  --   start_idx = start_idx + 1
+  -- end
+  -- return string.sub(file_path, start_idx)
 end
 
 ---@param project hopper.Project | string | nil
