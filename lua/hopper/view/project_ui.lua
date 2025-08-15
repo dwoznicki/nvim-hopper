@@ -1,5 +1,6 @@
 local projects = require("hopper.projects")
 local utils = require("hopper.utils")
+local options = require("hopper.options")
 
 local loop = vim.uv or vim.loop
 
@@ -56,15 +57,18 @@ end
 ---@class hopper.NewProjectFormOpenOptions
 ---@field on_created fun(form: hopper.NewProjectForm) | nil
 ---@field on_cancel fun(form: hopper.NewProjectForm) | nil
+---@field width integer | decimal | nil
 
 ---@param opts? hopper.NewProjectFormOpenOptions
 function NewProjectForm:open(opts)
   opts = opts or {}
+  local full_options = options.options()
   self.on_created = opts.on_created
   self.on_cancel = opts.on_cancel
 
   local ui = vim.api.nvim_list_uis()[1]
-  local win_width, _ = utils.get_win_dimensions()
+  local opts_width = opts.width or full_options.float.width
+  local win_width, _ = utils.get_win_dimensions(opts_width, 0)
   self.win_width = win_width
 
   local buf = vim.api.nvim_create_buf(false, true)

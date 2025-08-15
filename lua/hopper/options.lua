@@ -3,9 +3,12 @@ local keymaps = require("hopper.keymaps")
 
 local M = {}
 
+--- ========== Input Options ==========
+
 ---@class hopper.Options
 ---@field keymapping hopper.KeymappingOptions | nil
 ---@field db hopper.DatabaseOptions | nil
+---@field float hopper.FloatOptions | nil
 
 ---@class hopper.KeymappingOptions
 ---@field keyset string | string[] | nil
@@ -16,9 +19,16 @@ local M = {}
 ---@field sqlite_path string | nil
 ---@field database_path string | nil
 
+---@class hopper.FloatOptions
+---@field width integer | decimal | nil
+---@field height integer | decimal | nil
+
+--- ========== Resolved Options ==========
+
 ---@class hopper.ResolvedOptions
 ---@field keymapping hopper.ResolvedKeymappingOptions
 ---@field db hopper.ResolvedDatabaseOptions
+---@field float hopper.ResolvedFloatOptions
 
 ---@class hopper.ResolvedKeymappingOptions
 ---@field keyset string[]
@@ -29,15 +39,23 @@ local M = {}
 ---@field sqlite_path string
 ---@field database_path string
 
+---@class hopper.ResolvedFloatOptions
+---@field width integer | decimal
+---@field height integer | decimal
+
 local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
     keyset = keymaps.keysets.alphanumeric,
     length = 2,
-    default_open_cmd = "split",
+    default_open_cmd = "edit",
   },
   db = {
     sqlite_path = require("hopper.db.sqlite").DEFAULT_SQLITE_PATH,
     database_path = require("hopper.db.sqlite").DEFAULT_DB_PATH,
+  },
+  float = {
+    width = 0.6,
+    height = 0.6,
   },
 }
 

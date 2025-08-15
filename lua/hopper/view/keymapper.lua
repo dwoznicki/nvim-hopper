@@ -1,20 +1,21 @@
 local utils = require("hopper.utils")
 local keymaps = require("hopper.keymaps")
 local projects = require("hopper.projects")
+local options = require("hopper.options")
 
 local loop = vim.uv or vim.loop
 
 ---@alias hopper.HighlightLocation {name: string, row: integer, col_start: integer, col_end: integer}
 
----@alias hopper.KeymapFormValidationCode "keymap_conflict" | "keymap_will_be_deleted"
+---@alias hopper.KeymapperValidationCode "keymap_conflict" | "keymap_will_be_deleted"
 
----@class hopper.KeymapFormValidation
----@field code hopper.KeymapFormValidationCode
+---@class hopper.KeymapperValidation
+---@field code hopper.KeymapperValidationCode
 ---@field message string
 
 local M = {}
 
----@class hopper.KeymapForm
+---@class hopper.Keymapper
 ---@field project hopper.Project | nil
 ---@field path string
 ---@field keymap string
@@ -25,30 +26,30 @@ local M = {}
 ---@field win_width integer
 ---@field footer_buf integer
 ---@field footer_win integer
----@field validation hopper.KeymapFormValidation | nil
+---@field validation hopper.KeymapperValidation | nil
 ---@field suggested_keymap string | nil
 ---@field keymap_length integer | nil
----@field on_keymap_set fun(form: hopper.KeymapForm) | nil
----@field on_back fun(form: hopper.KeymapForm) | nil
-local KeymapForm = {}
-KeymapForm.__index = KeymapForm
-M.KeymapForm = KeymapForm
+---@field on_keymap_set fun(form: hopper.Keymapper) | nil
+---@field on_back fun(form: hopper.Keymapper) | nil
+local Keymapper = {}
+Keymapper.__index = Keymapper
+M.Keymapper = Keymapper
 
-KeymapForm.default_win_height = 4
-KeymapForm.default_footer_win_height = 2
-KeymapForm.ns = vim.api.nvim_create_namespace("hopper.KeymapForm")
-KeymapForm.footer_ns = vim.api.nvim_create_namespace("hopper.KeymapFormFooter")
+Keymapper.default_win_height = 4
+Keymapper.default_footer_win_height = 2
+Keymapper.ns = vim.api.nvim_create_namespace("hopper.Keymapper")
+Keymapper.footer_ns = vim.api.nvim_create_namespace("hopper.KeymapperFooter")
 
----@return hopper.KeymapForm
-function KeymapForm._new()
+---@return hopper.Keymapper
+function Keymapper._new()
   local form = {}
-  setmetatable(form, KeymapForm)
-  KeymapForm._reset(form)
+  setmetatable(form, Keymapper)
+  Keymapper._reset(form)
   return form
 end
 
----@param form hopper.KeymapForm
-function KeymapForm._reset(form)
+---@param form hopper.Keymapper
+function Keymapper._reset(form)
   form.project = nil
   form.path = ""
   form.keymap = ""
@@ -66,23 +67,26 @@ function KeymapForm._reset(form)
   form.on_back = nil
 end
 
----@class hopper.KeymapFormOpenOptions
+---@class hopper.KeymapperOpenOptions
 ---@field project hopper.Project | string | nil
 ---@field keymap_length integer | nil
----@field on_keymap_set fun(float: hopper.KeymapForm) | nil
----@field on_back fun(float: hopper.KeymapForm) | nil
+---@field on_keymap_set fun(float: hopper.Keymapper) | nil
+---@field on_back fun(float: hopper.Keymapper) | nil
+---@field width integer | decimal | nil
 
 ---@param path string
----@param opts? hopper.KeymapFormOpenOptions
-function KeymapForm:open(path, opts)
+---@param opts? hopper.KeymapperOpenOptions
+function Keymapper:open(path, opts)
   opts = opts or {}
+  local full_options = options.options()
   self.project = projects.ensure_project(opts.project)
-  self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
+  self.keymap_length = opts.keymap_length or full_options.keymapping.length
   self.on_keymap_set = opts.on_keymap_set
   self.on_back = opts.on_back
 
   local ui = vim.api.nvim_list_uis()[1]
-  local win_width, _ = utils.get_win_dimensions()
+  local opts_width = opts.width or full_options.float.width
+  local win_width, _ = utils.get_win_dimensions(opts_width, 0)
   self.win_width = win_width
 
   self.path = keymaps.truncate_path(path, win_width)
@@ -168,12 +172,12 @@ function KeymapForm:open(path, opts)
   end)
 end
 
-function KeymapForm:draw()
+function Keymapper:draw()
   self:draw_main()
   self:draw_footer()
 end
 
-function KeymapForm:draw_main()
+function Keymapper:draw_main()
   vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1)
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
@@ -206,7 +210,7 @@ function KeymapForm:draw_main()
   })
 end
 
-function KeymapForm:draw_footer()
+function Keymapper:draw_footer()
   vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
 
   local lines = {} ---@type string[][][]
@@ -271,7 +275,7 @@ function KeymapForm:draw_footer()
   })
 end
 
-function KeymapForm:confirm()
+function Keymapper:confirm()
   if not self:_can_confirm() then
     return
   end
@@ -291,7 +295,7 @@ function KeymapForm:confirm()
   end)
 end
 
-function KeymapForm:_suggest_keymap()
+function Keymapper:_suggest_keymap()
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
   if string.len(value) > 0 then
     return
@@ -304,7 +308,7 @@ function KeymapForm:_suggest_keymap()
   self:draw()
 end
 
-function KeymapForm:validate()
+function Keymapper:validate()
   if self.existing_file ~= nil and self.existing_file.path ~= self.path then
     self.validation = {
       code = "keymap_conflict",
@@ -323,7 +327,7 @@ function KeymapForm:validate()
   self.validation = nil
 end
 
-function KeymapForm:accept_suggestion()
+function Keymapper:accept_suggestion()
   if self.suggested_keymap == nil then
     return
   end
@@ -335,23 +339,23 @@ function KeymapForm:accept_suggestion()
   self:clear_suggestion()
 end
 
-function KeymapForm:clear_suggestion()
+function Keymapper:clear_suggestion()
   vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1)
   self.suggested_keymap = nil
   self:draw()
 end
 
-function KeymapForm:close()
+function Keymapper:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
   end
   if vim.api.nvim_win_is_valid(self.footer_win) then
     vim.api.nvim_win_close(self.footer_win, true)
   end
-  KeymapForm._reset(self)
+  Keymapper._reset(self)
 end
 
-function KeymapForm:_attach_event_handlers()
+function Keymapper:_attach_event_handlers()
   local buf = self.buf
 
   vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI", "TextChangedP"}, {
@@ -436,7 +440,7 @@ function KeymapForm:_attach_event_handlers()
 end
 
 ---@return boolean
-function KeymapForm:_can_confirm()
+function Keymapper:_can_confirm()
   if self.existing_file ~= nil and string.len(self.keymap) == 0 then
     -- User is clearing out an existing keymap. Allow it to be deleted.
     return true
@@ -448,12 +452,12 @@ function KeymapForm:_can_confirm()
   return true
 end
 
-local _form = nil ---@type hopper.KeymapForm | nil
+local _form = nil ---@type hopper.Keymapper | nil
 
----@return hopper.KeymapForm
+---@return hopper.Keymapper
 function M.form()
   if _form == nil then
-    _form = KeymapForm._new()
+    _form = Keymapper._new()
   end
   return _form
 end

@@ -1,13 +1,14 @@
 local utils = require("hopper.utils")
 local keymaps = require("hopper.keymaps")
 local projects = require("hopper.projects")
+local options = require("hopper.options")
 
 local M = {}
 
 ---@alias hopper.KeymapFileTree table<string, hopper.KeymapFileNode>
 ---@alias hopper.KeymapFileNode hopper.KeymapFileTree | hopper.FileMapping
 
----@class hopper.MainFloat
+---@class hopper.Jumper
 ---@field project hopper.Project | nil
 ---@field files hopper.FileMapping[]
 ---@field is_open boolean
@@ -21,23 +22,23 @@ local M = {}
 ---@field prior_buf integer
 ---@field keymap_length integer
 ---@field open_cmd string | nil
-local MainFloat = {}
-MainFloat.__index = MainFloat
-M.MainFloat = MainFloat
+local Jumper = {}
+Jumper.__index = Jumper
+M.Jumper = Jumper
 
-MainFloat.ns = vim.api.nvim_create_namespace("hopper.MainFloat")
-MainFloat.footer_ns = vim.api.nvim_create_namespace("hopper.MainFloatFooter")
+Jumper.ns = vim.api.nvim_create_namespace("hopper.Jumper")
+Jumper.footer_ns = vim.api.nvim_create_namespace("hopper.JumperFooter")
 
----@return hopper.MainFloat
-function MainFloat._new()
+---@return hopper.Jumper
+function Jumper._new()
   local float = {}
-  setmetatable(float, MainFloat)
-  MainFloat._reset(float)
+  setmetatable(float, Jumper)
+  Jumper._reset(float)
   return float
 end
 
----@param float hopper.MainFloat
-function MainFloat._reset(float)
+---@param float hopper.Jumper
+function Jumper._reset(float)
   float.project = nil
   float.files = {}
   float.is_open = false
@@ -53,25 +54,30 @@ function MainFloat._reset(float)
   float.open_cmd = nil
 end
 
----@class hopper.OpenMainFloatOptions
+---@class hopper.OpenJumperOptions
 ---@field project hopper.Project | string | nil
 ---@field prior_buf integer | nil
 ---@field keymap_length integer | nil
 ---@field open_cmd string | nil
+---@field width integer | decimal | nil
+---@field height integer | decimal | nil
 
----@param opts? hopper.OpenMainFloatOptions
-function MainFloat:open(opts)
+---@param opts? hopper.OpenJumperOptions
+function Jumper:open(opts)
   opts = opts or {}
+  local full_options = options.options()
   self.project = projects.ensure_project(opts.project)
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
-  self.keymap_length = opts.keymap_length or require("hopper.options").options().keymapping.length
-  self.open_cmd = opts.open_cmd or require("hopper.options").options().keymapping.default_open_cmd
+  self.keymap_length = opts.keymap_length or full_options.keymapping.length
+  self.open_cmd = opts.open_cmd or full_options.keymapping.default_open_cmd
   if self.open_cmd ~= nil and string.len(self.open_cmd) < 1 then
     vim.notify_once(string.format('Open command "%s" is invalid.', self.open_cmd), vim.log.levels.WARN)
   end
 
   local ui = vim.api.nvim_list_uis()[1]
-  local win_width, win_height = utils.get_win_dimensions()
+  local opts_width = opts.width or full_options.float.width
+  local opts_height = opts.height or full_options.float.height
+  local win_width, win_height = utils.get_win_dimensions(opts_width, opts_height)
   self.win_width = win_width
 
   local datastore = require("hopper.db").datastore()
@@ -123,7 +129,7 @@ function MainFloat:open(opts)
     col = win_config.col + 1,
     focusable = false,
     border = "none",
-    zindex = 51, -- Just enough to site on top of the main window.
+    zindex = 51, -- Just enough to site on top of the jumper window.
   }
   local footer_win = vim.api.nvim_open_win(footer_buf, false, footer_win_config)
 
@@ -139,7 +145,7 @@ function MainFloat:open(opts)
   self:draw_footer()
 end
 
-function MainFloat:draw()
+function Jumper:draw()
   vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1) -- clear highlights
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
@@ -168,7 +174,7 @@ function MainFloat:draw()
   })
 end
 
-function MainFloat:draw_footer()
+function Jumper:draw_footer()
   vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
   local help_line = {{" "}} ---@type string[][]
   local curr_mode = vim.api.nvim_get_mode().mode
@@ -195,22 +201,22 @@ function MainFloat:draw_footer()
   })
 end
 
-function MainFloat:close()
+function Jumper:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
   end
   if vim.api.nvim_win_is_valid(self.footer_win) then
     vim.api.nvim_win_close(self.footer_win, true)
   end
-  MainFloat._reset(self)
+  Jumper._reset(self)
 end
 
----@class hopper.NewReopenMainFloatOptions
+---@class hopper.NewReopenJumperOptions
 ---@field project_source "self" | "current"
 
----@param opts? hopper.NewReopenMainFloatOptions
----@return fun(el?: hopper.KeymapForm | hopper.NewProjectForm)
-function MainFloat:_new_reopen_callback(opts)
+---@param opts? hopper.NewReopenJumperOptions
+---@return fun(el?: hopper.Keymapper | hopper.NewProjectForm)
+function Jumper:_new_reopen_callback(opts)
   opts = opts or {}
   local prior_buf = self.prior_buf
   local project = self.project
@@ -229,7 +235,7 @@ end
 -- Set the list of files, including building out a tree of keymaps to file paths. This tree is
 -- important when determining whether a file keymapping has been activated during the text change
 -- handler.
-function MainFloat:_set_files(files)
+function Jumper:_set_files(files)
   local tree = {} ---@type hopper.KeymapFileTree
   for _, file in ipairs(files) do
     local node = tree ---@type hopper.KeymapFileNode | hopper.KeymapFileTree
@@ -250,7 +256,7 @@ function MainFloat:_set_files(files)
   self.keymap_file_tree = tree
 end
 
-function MainFloat:_attach_event_handlers()
+function Jumper:_attach_event_handlers()
   local buf = self.buf
 
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged", "TextChangedP"}, {
@@ -330,29 +336,19 @@ function MainFloat:_attach_event_handlers()
     end,
   })
 
-  -- vim.api.nvim_create_autocmd({"WinLeave", "BufWipeout"}, {
-  --   buffer = buf,
-  --   once = true,
-  --   callback = function()
-  --     vim.schedule(function()
-  --       self:close()
-  --     end)
-  --   end,
-  -- })
-
   -- Open new keymap view on K keypress.
   vim.keymap.set(
     "n",
     "K",
     function()
       local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
-      local reopen_main = self:_new_reopen_callback()
+      local reopen_jumper = self:_new_reopen_callback()
       require("hopper.view.keymapper").form():open(
         path,
         {
           project = self.project,
-          on_back = reopen_main,
-          on_keymap_set = reopen_main,
+          on_back = reopen_jumper,
+          on_keymap_set = reopen_jumper,
         }
       )
     end,
@@ -363,10 +359,10 @@ function MainFloat:_attach_event_handlers()
     "n",
     "p",
     function()
-      local reopen_main = self:_new_reopen_callback({project_source = "current"})
+      local reopen_jumper = self:_new_reopen_callback({project_source = "current"})
       require("hopper.view.project_ui").open_project_menu({
-        on_new_project_created = reopen_main,
-        on_current_project_changed = reopen_main,
+        on_new_project_created = reopen_jumper,
+        on_current_project_changed = reopen_jumper,
       })
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
@@ -382,12 +378,12 @@ function MainFloat:_attach_event_handlers()
   })
 end
 
-local _float = nil ---@type hopper.MainFloat | nil
+local _float = nil ---@type hopper.Jumper | nil
 
----@return hopper.MainFloat
+---@return hopper.Jumper
 function M.float()
   if _float == nil then
-    _float = MainFloat._new()
+    _float = Jumper._new()
   end
   return _float
 end

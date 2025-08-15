@@ -2,14 +2,29 @@
 
 local M = {}
 
+---@param width integer | decimal
+---@param height integer | decimal
 ---@return integer width, integer height
-function M.get_win_dimensions()
+function M.get_win_dimensions(width, height)
   local ui = vim.api.nvim_list_uis()[1]
-  local width = math.ceil(ui.width * 0.5)
-  -- For height, we'll try and choose a reasonable value without going over the available
-  -- remaining space.
-  local height = math.max(math.ceil(ui.height * 0.6), 16)
-  return width, height
+  local win_width ---@type integer
+  if width < 1 then
+    win_width = math.ceil(ui.width * width)
+  else
+    win_width = width
+  end
+  local win_height ---@type integer
+  if height < 1 then
+    win_height = math.ceil(ui.height * height)
+  else
+    win_height = height
+  end
+  return win_width, win_height
+  -- local width = math.ceil(ui.width * 0.5)
+  -- -- For height, we'll try and choose a reasonable value without going over the available
+  -- -- remaining space.
+  -- local height = math.max(math.ceil(ui.height * 0.6), 16)
+  -- return width, height
 end
 
 ---@param list string[]
