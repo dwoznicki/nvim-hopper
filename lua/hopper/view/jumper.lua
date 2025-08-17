@@ -363,6 +363,7 @@ function Jumper:_attach_event_handlers()
       require("hopper.view.project_ui").open_project_menu({
         on_new_project_created = reopen_jumper,
         on_current_project_changed = reopen_jumper,
+        on_project_deleted = reopen_jumper,
       })
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}

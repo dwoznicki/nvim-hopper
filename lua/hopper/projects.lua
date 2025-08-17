@@ -130,15 +130,6 @@ function M.path_from_project_root(project_path, file_path)
     relative_path = string.sub(relative_path, 2)
   end
   return relative_path
-  -- if vim.endswith(project_path, "/") then
-  --   -- Remove trailing "/" from path.
-  --   start_idx = start_idx + 1
-  -- end
-  -- if string.len(project_path) > 1 then
-  --   -- Remove separating "/", but only if it's not the same character as the leading "/".
-  --   start_idx = start_idx + 1
-  -- end
-  -- return string.sub(file_path, start_idx)
 end
 
 ---@param project hopper.Project | string | nil

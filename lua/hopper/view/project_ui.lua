@@ -21,6 +21,7 @@ local M = {}
 ---@field footer_win integer
 ---@field validation hopper.NewProjectFormValidation | nil
 ---@field suggested_project hopper.Project | nil
+---@field is_open boolean
 ---@field on_created fun(form: hopper.NewProjectForm) | nil
 ---@field on_cancel fun(form: hopper.NewProjectForm) | nil
 local NewProjectForm = {}
@@ -50,6 +51,7 @@ function NewProjectForm._reset(form)
   form.footer_win = -1
   form.validation = nil
   form.suggested_project = nil
+  form.is_open = false
   form.on_created = nil
   form.on_cancel = nil
 end
@@ -125,6 +127,7 @@ function NewProjectForm:open(opts)
   self.win = win
   self.footer_buf = footer_buf
   self.footer_win = footer_win
+  self.is_open = true
 
   self:_attach_event_handlers()
 
@@ -416,12 +419,8 @@ function M.form()
   return _form
 end
 
----@class hopper.ChangeCurrentProjectOptions
----@field on_changed? fun()
-
----@param opts? hopper.ChangeCurrentProjectOptions
-function M.change_current_project(opts)
-  opts = opts or {}
+---@return hopper.Project[]
+local function list_available_project_items()
   local added_names = {} ---@type table<string, true>
   local project_items = {} ---@type hopper.Project[]
 
@@ -441,6 +440,16 @@ function M.change_current_project(opts)
       added_names[project.name] = true
     end
   end
+  return project_items
+end
+
+---@class hopper.ChangeCurrentProjectOptions
+---@field on_changed? fun()
+
+---@param opts? hopper.ChangeCurrentProjectOptions
+function M.change_current_project(opts)
+  opts = opts or {}
+  local project_items = list_available_project_items()
 
   vim.ui.select(
     project_items,
@@ -461,9 +470,39 @@ function M.change_current_project(opts)
   )
 end
 
+---@class hopper.DeleteProjectOptions
+---@field on_deleted? fun()
+
+---@param opts? hopper.DeleteProjectOptions
+function M.delete_project(opts)
+  opts = opts or {}
+  local project_items = list_available_project_items()
+
+  vim.ui.select(
+    project_items,
+    {
+      prompt = "Choose a project to delete",
+      format_item = function(item)
+        return string.format("%s - %s", item.name, item.path)
+      end,
+    },
+    function(choice)
+      if choice ~= nil then
+        local datastore = require("hopper.db").datastore()
+        datastore:remove_project(choice.name)
+        vim.notify(string.format("Project %s deleted.", choice.name))
+        if opts.on_deleted ~= nil then
+          opts.on_deleted()
+        end
+      end
+    end
+  )
+end
+
 ---@class hopper.OpenProjectMenuOptions
 ---@field on_new_project_created fun(form: hopper.NewProjectForm) | nil
 ---@field on_current_project_changed fun() | nil
+---@field on_project_deleted fun() | nil
 
 ---@param opts? hopper.OpenProjectMenuOptions
 function M.open_project_menu(opts)
@@ -472,6 +511,7 @@ function M.open_project_menu(opts)
     {
       "Create new project",
       "Change current project",
+      "Delete project",
     },
     {
       prompt = "Select an option",
@@ -484,6 +524,10 @@ function M.open_project_menu(opts)
       elseif idx == 2 then
         M.change_current_project({
           on_changed = opts.on_current_project_changed,
+        })
+      elseif idx == 3 then
+        M.delete_project({
+          on_deleted = opts.on_project_deleted,
         })
       end
     end
