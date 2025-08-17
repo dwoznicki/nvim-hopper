@@ -55,7 +55,7 @@ end
 ---@param name string
 ---@param path string
 ---@return hopper.Project
-function M.create_project(name, path)
+function M.save_project(name, path)
   local datastore = require("hopper.db").datastore()
   datastore:set_project(name, path)
   return {
@@ -65,7 +65,7 @@ function M.create_project(name, path)
 end
 
 ---@param name string
-function M.remove_project(name)
+function M.delete_project(name)
   local datastore = require("hopper.db").datastore()
   datastore:remove_project(name)
 end
@@ -77,7 +77,7 @@ end
 ---@param keymap string
 ---@param opts? hopper.CreateKeymapOptions
 ---@return hopper.FileMapping
-function M.create_keymap(keymap, path, opts)
+function M.save_file_keymap(keymap, path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
@@ -94,7 +94,7 @@ end
 
 ---@param path string
 ---@param opts? hopper.RemoveKeymapOptions
-function M.remove_keymap(path, opts)
+function M.delete_file_keymap(path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()

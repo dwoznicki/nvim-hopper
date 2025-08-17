@@ -11,9 +11,9 @@ end
 M.toggle_jumper = require("hopper.actions").toggle_jumper
 M.toggle_keymapper = require("hopper.actions").toggle_keymapper
 M.toggle_info = require("hopper.actions").toggle_info
-M.create_project = require("hopper.actions").create_project
-M.remove_project = require("hopper.actions").remove_project
-M.create_keymap = require("hopper.actions").create_keymap
-M.remove_keymap = require("hopper.actions").remove_keymap
+M.save_project = require("hopper.actions").save_project
+M.delete_project = require("hopper.actions").delete_project
+M.save_file_keymap = require("hopper.actions").save_file_keymap
+M.delete_file_keymap = require("hopper.actions").delete_file_keymap
 
 return M
