@@ -3,6 +3,19 @@ local projects = require("hopper.projects")
 
 local M = {}
 
+-- =================
+-- = Lua functions =
+-- =================
+
+function M.toggle_jumper()
+  local float = require("hopper.view.jumper").float()
+  if float.is_open then
+    float:close()
+  else
+    float:open()
+  end
+end
+
 function M.toggle_keymapper()
   local project = projects.current_project()
   local file_path = vim.api.nvim_buf_get_name(0)
@@ -12,15 +25,6 @@ function M.toggle_keymapper()
     float:close()
   else
     float:open(path)
-  end
-end
-
-function M.toggle_jumper()
-  local float = require("hopper.view.jumper").float()
-  if float.is_open then
-    float:close()
-  else
-    float:open()
   end
 end
 
@@ -48,7 +52,7 @@ function M.jump_to_file(keymap, opts)
     vim.notify(string.format('Unable to find file for keymap "%s" in project "%s".', keymap, project), vim.log.levels.WARN)
     return
   end
-  local file_path = projects.path_from_project_root(project.path, file.path)
+  local file_path = projects.path_from_cwd(project.path, file.path)
   utils.open_or_focus_file(file_path, {open_cmd = opts.open_cmd})
 end
 
@@ -127,12 +131,12 @@ function M.file_keymaps_picker(opts)
   })
 end
 
----@class hopper.CreateKeymapOptions
+---@class hopper.SaveFileKeymapOptions
 ---@field project hopper.Project | string | nil
 
 ---@param path string
 ---@param keymap string
----@param opts? hopper.CreateKeymapOptions
+---@param opts? hopper.SaveFileKeymapOptions
 ---@return hopper.FileMapping
 function M.save_file_keymap(keymap, path, opts)
   opts = opts or {}
@@ -146,16 +150,91 @@ function M.save_file_keymap(keymap, path, opts)
   return file
 end
 
----@class hopper.RemoveKeymapOptions
+---@class hopper.DeleteFileKeymapOptions
 ---@field project hopper.Project | string | nil
 
 ---@param path string
----@param opts? hopper.RemoveKeymapOptions
+---@param opts? hopper.DeleteFileKeymapOptions
 function M.delete_file_keymap(path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
   datastore:remove_file_keymap(project.name, path)
+end
+
+-- ================
+-- = User command =
+-- ================
+
+---@class hopper.UserCommandOptions
+---@field name string Command name
+---@field args string The args passed to the command, if any
+---@field fargs string[] The args split by unescaped whitespace (when more than one argument is allowed), if any
+---@field nargs string Number of arguments `:command-nargs`
+---@field bang boolean "true" if the command was executed with a ! modifier
+---@field line1 number The starting line of the command range
+---@field line2 number The final line of the command range
+---@field range number The number of items in the command range: 0, 1, or 2
+---@field count number Any count supplied
+---@field reg string The optional register, if specified
+---@field mods string Command modifiers, if any
+---@field smods table Command modifiers in a structured format. Has the same structure as the "mods" key of `nvim_parse_cmd()`.
+
+---@param opts hopper.UserCommandOptions
+local function handle_command(opts)
+  -- local subcommand, keyword_args = opts.fargs[1]
+  local subcommand, kv_args = utils.parse_user_command_args(opts.fargs)
+  if subcommand == "toggle_jumper" then
+    M.toggle_jumper()
+  elseif subcommand == "toggle_keymapper" then
+    M.toggle_keymapper()
+  elseif subcommand == "toggle_info" then
+    M.toggle_info()
+  elseif subcommand == "file_keymaps_picker" then
+    M.file_keymaps_picker(kv_args)
+  elseif subcommand == "jump_to_file" then
+    M.jump_to_file(kv_args.keymap, kv_args)
+  elseif subcommand == "save_project" then
+    error("TODO")
+  elseif subcommand == "delete_project" then
+    error("TODO")
+  elseif subcommand == "list_file_keymaps" then
+    error("TODO")
+  elseif subcommand == "save_file_keymap" then
+    error("TODO")
+  elseif subcommand == "delete_file_keymap" then
+    error("TODO")
+  else
+    print("Unrecognized subcommand: " .. (subcommand or "nil"))
+  end
+end
+
+local function complete_subcommand(_, _, _)
+  return {
+    "toggle_jumper",
+    "toggle_keymapper",
+    "toggle_info",
+    "file_keymaps_picker",
+    "jump_to_file",
+    "save_project",
+    "delete_project",
+    "list_file_keymaps",
+    "save_file_keymap",
+    "delete_file_keymap",
+  }
+end
+
+---Setup ex commands. 
+M.setup = function()
+  vim.api.nvim_create_user_command(
+    "Hopper",
+    handle_command,
+    {
+      nargs = 1,
+      complete = complete_subcommand,
+      desc = "Hopper entry command",
+    }
+  )
 end
 
 return M

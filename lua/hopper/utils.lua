@@ -195,4 +195,48 @@ function M.attach_close_events(opts)
 
 end
 
+---@param fargs string[]
+---@return string, table<string, any> | nil
+function M.parse_user_command_args(fargs)
+  local function strip_quotes(s)
+    -- remove single OR double surrounding quotes if present
+    local inner = s:match([[^"(.*)"$]]) or s:match([[^'(.*)'$]])
+    return inner or s
+  end
+
+  local subcommand = fargs[1]
+  local other_fargs = vim.list_slice(fargs, 2)
+
+  local kv_args = {}
+  for _, a in ipairs(other_fargs) do
+    local key, val = a:match("^([%w_%.%-]+)=(.+)$")
+    if key then
+      val = strip_quotes(val)
+      -- simple coercion
+      if val == "true" then
+        val = true
+      elseif val == "false" then
+        val = false
+      else
+        local num = tonumber(val)
+        if num ~= nil then val = num end
+      end
+
+      -- support repeated keys → array
+      if kv_args[key] ~= nil then
+        if type(kv_args[key]) ~= "table" then kv_args[key] = { kv_args[key] } end
+        table.insert(kv_args[key], val)
+      else
+        kv_args[key] = val
+      end
+    else
+      -- bare flag: treat as true (e.g. `--force` style without =)
+      local flag = a:match("^([%w_%.%-]+)$")
+      if flag then kv_args[flag] = true end
+    end
+  end
+  return subcommand, kv_args
+end
+
+
 return M
