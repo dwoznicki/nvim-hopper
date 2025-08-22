@@ -92,7 +92,7 @@ function Keymapper:open(path, opts)
   self.path = keymaps.truncate_path(path, win_width)
 
   local datastore = require("hopper.db").datastore()
-  local existing_file = datastore:get_file_by_path(self.project.name, path)
+  local existing_file = datastore:get_file_keymap_by_path(self.project.name, path)
   local existing_keymap = nil ---@type string | nil
   if existing_file ~= nil then
     existing_keymap = existing_file.keymap
@@ -282,9 +282,9 @@ function Keymapper:confirm()
   local datastore = require("hopper.db").datastore()
   if self.existing_file ~= nil and string.len(self.keymap) == 0 then
     -- User has cleared out an existing keymap and confirmed. Consider this a delete call.
-    datastore:remove_file(self.project.name, self.path)
+    datastore:remove_file_keymap(self.project.name, self.path)
   else
-    datastore:set_file(self.project.name, self.path, self.keymap)
+    datastore:set_file_keymap(self.project.name, self.path, self.keymap)
   end
   vim.schedule(function()
     if self.on_keymap_set ~= nil then

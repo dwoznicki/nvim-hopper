@@ -81,7 +81,7 @@ function Jumper:open(opts)
   self.win_width = win_width
 
   local datastore = require("hopper.db").datastore()
-  local files = datastore:list_files(self.project.name, self.keymap_length)
+  local files = datastore:list_file_keymaps(self.project.name, self.keymap_length)
   self:_set_files(files)
 
   local buf = vim.api.nvim_create_buf(false, true)
@@ -297,7 +297,6 @@ function Jumper:_attach_event_handlers()
       end
       if selected.path ~= nil then
         -- The selected object is a valid file. Open it.
-        vim.print(selected)
         local path = selected.path ---@type string
         local open_cmd = self.open_cmd
         self:close()

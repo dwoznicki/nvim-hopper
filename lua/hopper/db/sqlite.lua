@@ -284,8 +284,8 @@ end
 ---@field select_project_by_name_stmt hopper.PreparedStatement | nil
 ---@field select_project_by_path_stmt hopper.PreparedStatement | nil
 ---@field create_projects_table_stmt hopper.PreparedStatement | nil
----@field create_file_mappings_table_stmt hopper.PreparedStatement | nil
----@field create_file_mappings_project_idx_stmt hopper.PreparedStatement | nil
+---@field create_file_keymaps_table_stmt hopper.PreparedStatement | nil
+---@field create_file_keymaps_project_idx_stmt hopper.PreparedStatement | nil
 ---@field insert_project_stmt hopper.PreparedStatement | nil
 ---@field update_project_stmt hopper.PreparedStatement | nil
 ---@field delete_project_stmt hopper.PreparedStatement | nil
@@ -326,9 +326,9 @@ function SqlDatastore:init()
     ]], self.conn)
   end
   self.create_projects_table_stmt:exec_update()
-  if self.create_file_mappings_table_stmt == nil then
-    self.create_file_mappings_table_stmt = PreparedStatement.new([[
-      CREATE TABLE IF NOT EXISTS file_mappings (
+  if self.create_file_keymaps_table_stmt == nil then
+    self.create_file_keymaps_table_stmt = PreparedStatement.new([[
+      CREATE TABLE IF NOT EXISTS file_keymaps (
         id INTEGER PRIMARY KEY,
         project TEXT NOT NULL,
         path TEXT NOT NULL,
@@ -339,13 +339,13 @@ function SqlDatastore:init()
       )
     ]], self.conn)
   end
-  self.create_file_mappings_table_stmt:exec_update()
-  if self.create_file_mappings_project_idx_stmt == nil then
-    self.create_file_mappings_project_idx_stmt = PreparedStatement.new([[
-      CREATE INDEX IF NOT EXISTS file_mappings_project_idx ON file_mappings (project);
+  self.create_file_keymaps_table_stmt:exec_update()
+  if self.create_file_keymaps_project_idx_stmt == nil then
+    self.create_file_keymaps_project_idx_stmt = PreparedStatement.new([[
+      CREATE INDEX IF NOT EXISTS file_keymaps_project_idx ON file_keymaps (project);
     ]], self.conn)
   end
-  self.create_file_mappings_project_idx_stmt:exec_update()
+  self.create_file_keymaps_project_idx_stmt:exec_update()
 end
 
 ---@alias hopper.Project {name: string, path: string}
@@ -445,7 +445,7 @@ function SqlDatastore:remove_project(name)
   self.delete_project_stmt:exec_update({name})
   if self.delete_files_for_project_stmt == nil then
     self.delete_files_for_project_stmt = PreparedStatement.new([[
-      DELETE FROM file_mappings WHERE project = ?
+      DELETE FROM file_keymaps WHERE project = ?
     ]], self.conn)
   end
   self.delete_files_for_project_stmt:exec_update({name})
@@ -454,33 +454,33 @@ end
 ---@param project? string Optionally filer by project.
 ---@param keymap_length? integer Optionally filter by keymap length.
 ---@return hopper.FileMapping[]
-function SqlDatastore:list_files(project, keymap_length)
+function SqlDatastore:list_file_keymaps(project, keymap_length)
   local results ---@type string[][]
   if project ~= nil and keymap_length ~= nil then
     if self.select_files_with_project_and_keymap_len_stmt == nil then
       self.select_files_with_project_and_keymap_len_stmt = PreparedStatement.new([[
-        SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND length(keymap) = ? ORDER BY created
+        SELECT id, project, path, keymap FROM file_keymaps WHERE project = ? AND length(keymap) = ? ORDER BY created
       ]], self.conn)
     end
     results = self.select_files_with_project_and_keymap_len_stmt:exec_query({project, keymap_length})
   elseif project ~= nil then
     if self.select_files_with_project_stmt == nil then
       self.select_files_with_project_stmt = PreparedStatement.new([[
-        SELECT id, project, path, keymap FROM file_mappings WHERE project = ? ORDER BY created
+        SELECT id, project, path, keymap FROM file_keymaps WHERE project = ? ORDER BY created
       ]], self.conn)
     end
     results = self.select_files_with_project_stmt:exec_query({project})
   elseif keymap_length ~= nil then
     if self.select_files_with_keymap_len_stmt == nil then
       self.select_files_with_keymap_len_stmt = PreparedStatement.new([[
-        SELECT id, project, path, keymap FROM file_mappings WHERE length(keymap) = ? ORDER BY created
+        SELECT id, project, path, keymap FROM file_keymaps WHERE length(keymap) = ? ORDER BY created
       ]], self.conn)
     end
     results = self.select_files_with_keymap_len_stmt:exec_query({keymap_length})
   else
     if self.select_files_stmt == nil then
       self.select_files_stmt = PreparedStatement.new([[
-        SELECT id, project, path, keymap FROM file_mappings ORDER BY created
+        SELECT id, project, path, keymap FROM file_keymaps ORDER BY created
       ]], self.conn)
     end
     results = self.select_files_stmt:exec_query()
@@ -502,7 +502,7 @@ end
 function SqlDatastore:list_keymaps(project)
   if self.select_keymaps_stmt == nil then
     self.select_keymaps_stmt = PreparedStatement.new([[
-      SELECT keymap FROM file_mappings WHERE project = ?
+      SELECT keymap FROM file_keymaps WHERE project = ?
     ]], self.conn)
   end
   local results = self.select_keymaps_stmt:exec_query({project})
@@ -516,10 +516,10 @@ end
 ---@param project string
 ---@param keymap string
 ---@return hopper.FileMapping | nil
-function SqlDatastore:get_file_by_keymap(project, keymap)
+function SqlDatastore:get_file_keymap_by_keymap(project, keymap)
   if self.select_file_by_keymap_stmt == nil then
     self.select_file_by_keymap_stmt = PreparedStatement.new([[
-      SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND keymap = ?
+      SELECT id, project, path, keymap FROM file_keymaps WHERE project = ? AND keymap = ?
     ]], self.conn)
   end
   local results = self.select_file_by_keymap_stmt:exec_query({project, keymap})
@@ -537,10 +537,10 @@ end
 ---@param project string
 ---@param path string
 ---@return hopper.FileMapping | nil
-function SqlDatastore:get_file_by_path(project, path)
+function SqlDatastore:get_file_keymap_by_path(project, path)
   if self.select_file_by_path_stmt == nil then
     self.select_file_by_path_stmt = PreparedStatement.new([[
-      SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND path = ?
+      SELECT id, project, path, keymap FROM file_keymaps WHERE project = ? AND path = ?
     ]], self.conn)
   end
   local results = self.select_file_by_path_stmt:exec_query({project, path})
@@ -558,17 +558,17 @@ end
 ---@param project string
 ---@param path string
 ---@param keymap string
-function SqlDatastore:set_file(project, path, keymap)
+function SqlDatastore:set_file_keymap(project, path, keymap)
   if self.select_file_id_by_path_stmt == nil then
     self.select_file_id_by_path_stmt = PreparedStatement.new([[
-      SELECT id FROM file_mappings WHERE project = ? AND path = ?
+      SELECT id FROM file_keymaps WHERE project = ? AND path = ?
     ]], self.conn)
   end
   local results = self.select_file_id_by_path_stmt:exec_query({project, path})
   if #results < 1 then
     if self.insert_file_stmt == nil then
       self.insert_file_stmt = PreparedStatement.new([[
-        INSERT INTO file_mappings (project, path, keymap, created)
+        INSERT INTO file_keymaps (project, path, keymap, created)
         VALUES (?, ?, ?, unixepoch())
       ]], self.conn)
     end
@@ -576,7 +576,7 @@ function SqlDatastore:set_file(project, path, keymap)
   else
     if self.update_file_stmt == nil then
       self.update_file_stmt = PreparedStatement.new([[
-        UPDATE file_mappings SET keymap = ? WHERE id = ?
+        UPDATE file_keymaps SET keymap = ? WHERE id = ?
       ]], self.conn)
     end
     self.update_file_stmt:exec_update({keymap, results[1][1]})
@@ -585,10 +585,10 @@ end
 
 ---@param project string
 ---@param path string
-function SqlDatastore:remove_file(project, path)
+function SqlDatastore:remove_file_keymap(project, path)
   if self.delete_file_stmt == nil then
     self.delete_file_stmt = PreparedStatement.new([[
-      DELETE FROM file_mappings WHERE project = ? AND path = ?
+      DELETE FROM file_keymaps WHERE project = ? AND path = ?
     ]], self.conn)
   end
   self.delete_file_stmt:exec_update({project, path})

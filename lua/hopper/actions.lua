@@ -43,7 +43,7 @@ function M.jump_to_file(keymap, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
-  local file = datastore:get_file_by_keymap(project.name, keymap)
+  local file = datastore:get_file_keymap_by_keymap(project.name, keymap)
   if file == nil then
     vim.notify(string.format('Unable to find file for keymap "%s" in project "%s".', keymap, project), vim.log.levels.WARN)
     return
@@ -78,7 +78,7 @@ end
 function M.list_file_keymaps(opts)
   opts = opts or {}
   local datastore = require("hopper.db").datastore()
-  return datastore:list_files(opts.project_filter, opts.keymap_length_filter)
+  return datastore:list_file_keymaps(opts.project_filter, opts.keymap_length_filter)
 end
 
 ---@class hopper.FileKeymapsPickerOptions
@@ -94,7 +94,7 @@ function M.file_keymaps_picker(opts)
     finder = function()
       local items = {}
       local datastore = require("hopper.db").datastore()
-      local files = datastore:list_files(opts.project_filter, opts.keymap_length_filter)
+      local files = datastore:list_file_keymaps(opts.project_filter, opts.keymap_length_filter)
       for _, file in ipairs(files) do
         table.insert(items, {
           text = string.format("%s %s %s", file.project, file.path, file.keymap),
@@ -112,7 +112,7 @@ function M.file_keymaps_picker(opts)
           return
         end
         local datastore = require("hopper.db").datastore()
-        datastore:remove_file(item.project, item.path)
+        datastore:remove_file_keymap(item.project, item.path)
         -- Reset picker.
         picker:find()
       end,
@@ -138,8 +138,8 @@ function M.save_file_keymap(keymap, path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
-  datastore:set_file(project.name, path, keymap)
-  local file = datastore:get_file_by_path(project.name, path)
+  datastore:set_file_keymap(project.name, path, keymap)
+  local file = datastore:get_file_keymap_by_path(project.name, path)
   if file == nil then
     error("Unable to find file keymap.")
   end
@@ -155,7 +155,7 @@ function M.delete_file_keymap(path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
   local datastore = require("hopper.db").datastore()
-  datastore:remove_file(project.name, path)
+  datastore:remove_file_keymap(project.name, path)
 end
 
 return M
