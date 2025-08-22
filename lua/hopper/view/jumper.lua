@@ -297,7 +297,7 @@ function Jumper:_attach_event_handlers()
       end
       if selected.path ~= nil then
         -- The selected object is a valid file. Open it.
-        local path = selected.path ---@type string
+        local path = projects.path_from_cwd(self.project.path, selected.path)
         local open_cmd = self.open_cmd
         self:close()
         -- Need to defer the new file load so that this float can properly finish closing before

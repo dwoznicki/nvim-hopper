@@ -121,16 +121,6 @@ end
 ---@param file_path string
 ---@return string path_from_project_root
 function M.path_from_project_root(project_path, file_path)
-  -- if not vim.startswith(file_path, project_path) then
-  --   error(string.format("File %s is not part of the current project %s.", file_path, project_path))
-  -- end
-  -- local start_idx = string.len(project_path) + 1
-  -- local relative_path = string.sub(file_path, start_idx)
-  -- if vim.startswith(relative_path, "/") then
-  --   relative_path = string.sub(relative_path, 2)
-  -- end
-  -- return relative_path
-
   -- Resolve symlinks.
   project_path = loop.fs_realpath(project_path) or project_path
   file_path = loop.fs_realpath(file_path) or file_path
@@ -178,6 +168,29 @@ function M.path_from_project_root(project_path, file_path)
     return "."
   end
   return table.concat(vim.list_extend(up, down), "/")
+end
+
+---@param project_path string
+---@param file_path string
+---@return string normalized_file_path
+function M.path_from_cwd(project_path, file_path)
+  if not project_path:match("/$") then
+    project_path = project_path .. "/"
+  end
+  file_path = project_path .. file_path
+  -- Make paths absolute.
+  file_path = vim.fn.fnamemodify(file_path, ":p")
+  file_path = vim.fs.normalize(file_path)
+  local cwd = loop.cwd()
+  -- Ensure root ends with a slash for prefix match.
+  if not cwd:match("/$") then
+    cwd = cwd .. "/"
+  end
+    -- File is inside cwd.
+  if file_path:sub(1, #cwd) == cwd then
+    return file_path:sub(#cwd + 1)
+  end
+  return file_path
 end
 
 ---@param project hopper.Project | string | nil

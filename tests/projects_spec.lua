@@ -33,4 +33,36 @@ describe("projects", function()
       )
     end)
   end)
+
+  describe("path_from_cwd", function()
+    it("should return path from CWD for simple cases", function()
+      local cwd = vim.uv.cwd()
+      assert.equal(
+        "src/mod.lua",
+        projects.path_from_cwd(cwd, "src/mod.lua")
+      )
+    end)
+    it("should return path from CWD when project path doesn't match CWD", function()
+      local cwd = vim.uv.cwd()
+      assert.equal(
+        "abc/123/src/mod.lua",
+        projects.path_from_cwd(cwd .. "/abc/123", "src/mod.lua")
+      )
+    end)
+    it("should resolve relative paths", function()
+      local cwd = vim.uv.cwd()
+      assert.equal(
+        "src/mod.lua",
+        projects.path_from_cwd(cwd .. "/abc/123", "../../src/mod.lua")
+      )
+    end)
+    it("should return absolute path when CWD doesn't path file path at all", function()
+      -- NOTE: This test will fail if this project path somehow actually exists. But that'll never
+      -- happen, right?
+      assert.equal(
+        "/home/󰤇 /proj/src/mod.lua",
+        projects.path_from_cwd("/home/󰤇 /proj", "src/mod.lua")
+      )
+    end)
+  end)
 end)
