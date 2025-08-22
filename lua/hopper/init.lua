@@ -7,7 +7,6 @@ local M = {}
 function M.setup(options)
   require("hopper.options").set_options(options)
   require("hopper.styling").setup()
-  require("hopper.usercommand").setup()
 end
 
 M.toggle_jumper = actions.toggle_jumper
