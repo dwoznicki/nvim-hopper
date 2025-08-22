@@ -121,15 +121,63 @@ end
 ---@param file_path string
 ---@return string path_from_project_root
 function M.path_from_project_root(project_path, file_path)
-  if not vim.startswith(file_path, project_path) then
-    error(string.format("File %s is not part of the current project %s.", file_path, project_path))
+  -- if not vim.startswith(file_path, project_path) then
+  --   error(string.format("File %s is not part of the current project %s.", file_path, project_path))
+  -- end
+  -- local start_idx = string.len(project_path) + 1
+  -- local relative_path = string.sub(file_path, start_idx)
+  -- if vim.startswith(relative_path, "/") then
+  --   relative_path = string.sub(relative_path, 2)
+  -- end
+  -- return relative_path
+
+  -- Resolve symlinks.
+  project_path = loop.fs_realpath(project_path) or project_path
+  file_path = loop.fs_realpath(file_path) or file_path
+
+  -- Make paths absolute.
+  project_path = vim.fn.fnamemodify(project_path, ":p")
+  file_path = vim.fn.fnamemodify(file_path, ":p")
+
+  -- Normalize separators.
+  project_path = vim.fs.normalize(project_path)
+  file_path = vim.fs.normalize(file_path)
+
+    -- Ensure root ends with a slash for prefix match.
+  if not project_path:match("/$") then
+    project_path = project_path .. "/"
   end
-  local start_idx = string.len(project_path) + 1
-  local relative_path = string.sub(file_path, start_idx)
-  if vim.startswith(relative_path, "/") then
-    relative_path = string.sub(relative_path, 2)
+
+    -- File is inside root.
+  if file_path:sub(1, #project_path) == project_path then
+    return file_path:sub(#project_path + 1)
   end
-  return relative_path
+
+    -- Otherwise build a relative path via common prefix.
+  local function split(p)
+    return vim.split(p:gsub("/+$",""), "/", {plain = true})
+  end
+
+  local project_path_tokens = split(project_path)
+  local file_path_tokens = split(file_path)
+  local i = 1
+  while i <= #project_path_tokens and i <= #file_path_tokens and project_path_tokens[i] == file_path_tokens[i] do
+    i = i + 1
+  end
+
+  local up = {}
+  for _ = i, #project_path_tokens do
+    up[#up+1] = ".."
+  end
+  local down = {}
+  for j = i, #file_path_tokens do
+    down[#down+1] = file_path_tokens[j]
+  end
+
+  if #up == 0 and #down == 0 then
+    return "."
+  end
+  return table.concat(vim.list_extend(up, down), "/")
 end
 
 ---@param project hopper.Project | string | nil

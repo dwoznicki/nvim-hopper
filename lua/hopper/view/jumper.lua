@@ -179,13 +179,13 @@ function Jumper:draw_footer()
   local help_line = {{" "}} ---@type string[][]
   local curr_mode = vim.api.nvim_get_mode().mode
   if curr_mode == "n" then
-    table.insert(help_line, {"K", "Function"})
+    table.insert(help_line, {"k", "Function"})
     table.insert(help_line, {" Keymap"})
     table.insert(help_line, {"  "})
     table.insert(help_line, {"p", "Function"})
     table.insert(help_line, {" Project"})
   else
-    table.insert(help_line, {"K Keymap", "Comment"})
+    table.insert(help_line, {"k Keymap", "Comment"})
     table.insert(help_line, {"  "})
     table.insert(help_line, {"p Project", "Comment"})
   end
@@ -336,10 +336,10 @@ function Jumper:_attach_event_handlers()
     end,
   })
 
-  -- Open new keymap view on K keypress.
+  -- Open new keymap view on "k" keypress.
   vim.keymap.set(
     "n",
-    "K",
+    "k",
     function()
       local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
       local reopen_jumper = self:_new_reopen_callback()
@@ -354,7 +354,7 @@ function Jumper:_attach_event_handlers()
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
   )
-  -- Open project menu on P keypress.
+  -- Open project menu on "p" keypress.
   vim.keymap.set(
     "n",
     "p",

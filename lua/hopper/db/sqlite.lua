@@ -289,8 +289,10 @@ end
 ---@field insert_project_stmt hopper.PreparedStatement | nil
 ---@field update_project_stmt hopper.PreparedStatement | nil
 ---@field delete_project_stmt hopper.PreparedStatement | nil
----@field select_files_stmt hopper.PreparedStatement | nil
+---@field select_files_with_project_and_keymap_len_stmt hopper.PreparedStatement | nil
+---@field select_files_with_project_stmt hopper.PreparedStatement | nil
 ---@field select_files_with_keymap_len_stmt hopper.PreparedStatement | nil
+---@field select_files_stmt hopper.PreparedStatement | nil
 ---@field select_keymaps_stmt hopper.PreparedStatement | nil
 ---@field select_file_id_by_path_stmt hopper.PreparedStatement | nil
 ---@field select_file_by_keymap_stmt hopper.PreparedStatement | nil
@@ -449,25 +451,39 @@ function SqlDatastore:remove_project(name)
   self.delete_files_for_project_stmt:exec_update({name})
 end
 
----@param project string
----@param keymap_length integer | nil Optionally filter by keymap length.
+---@param project? string Optionally filer by project.
+---@param keymap_length? integer Optionally filter by keymap length.
 ---@return hopper.FileMapping[]
 function SqlDatastore:list_files(project, keymap_length)
   local results ---@type string[][]
-  if keymap_length == nil then
-    if self.select_files_stmt == nil then
-      self.select_files_stmt = PreparedStatement.new([[
-        SELECT id, project, path, keymap FROM file_mappings WHERE project = ? ORDER BY created
-      ]], self.conn)
-    end
-    results = self.select_files_stmt:exec_query({project})
-  else
-    if self.select_files_with_keymap_len_stmt == nil then
-      self.select_files_with_keymap_len_stmt = PreparedStatement.new([[
+  if project ~= nil and keymap_length ~= nil then
+    if self.select_files_with_project_and_keymap_len_stmt == nil then
+      self.select_files_with_project_and_keymap_len_stmt = PreparedStatement.new([[
         SELECT id, project, path, keymap FROM file_mappings WHERE project = ? AND length(keymap) = ? ORDER BY created
       ]], self.conn)
     end
-    results = self.select_files_with_keymap_len_stmt:exec_query({project, keymap_length})
+    results = self.select_files_with_project_and_keymap_len_stmt:exec_query({project, keymap_length})
+  elseif project ~= nil then
+    if self.select_files_with_project_stmt == nil then
+      self.select_files_with_project_stmt = PreparedStatement.new([[
+        SELECT id, project, path, keymap FROM file_mappings WHERE project = ? ORDER BY created
+      ]], self.conn)
+    end
+    results = self.select_files_with_project_stmt:exec_query({project})
+  elseif keymap_length ~= nil then
+    if self.select_files_with_keymap_len_stmt == nil then
+      self.select_files_with_keymap_len_stmt = PreparedStatement.new([[
+        SELECT id, project, path, keymap FROM file_mappings WHERE length(keymap) = ? ORDER BY created
+      ]], self.conn)
+    end
+    results = self.select_files_with_keymap_len_stmt:exec_query({keymap_length})
+  else
+    if self.select_files_stmt == nil then
+      self.select_files_stmt = PreparedStatement.new([[
+        SELECT id, project, path, keymap FROM file_mappings ORDER BY created
+      ]], self.conn)
+    end
+    results = self.select_files_stmt:exec_query()
   end
   local files = {} ---@type hopper.FileMapping[]
   for _, result in ipairs(results) do
