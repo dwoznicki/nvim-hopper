@@ -184,14 +184,14 @@ function Keymapper:draw_main()
   local used = string.len(value)
   vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
     virt_text = {
-      {string.format("%d/%d", used, self.keymap_length), "Comment"}
+      {string.format("%d/%d", used, self.keymap_length), "hopper.DisabledText"}
     },
     virt_text_pos = "right_align",
   })
 
   if self.suggested_keymap ~= nil and string.len(self.suggested_keymap) > 0 and string.len(value) < 1 then
     vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
-      virt_text = {{self.suggested_keymap, "Comment"}},
+      virt_text = {{self.suggested_keymap, "hopper.DisabledText"}},
       virt_text_pos = "overlay",
     })
   end
@@ -244,17 +244,17 @@ function Keymapper:draw_footer()
 
   local help_line = {{"  "}} ---@type string[][]
   if self:_can_confirm() then
-    table.insert(help_line, {"󰌑 ", "Function"})
+    table.insert(help_line, {"󰌑 ", "hopper.ActionText"})
     table.insert(help_line, {" Confirm"})
   else
-    table.insert(help_line, {"󰌑  Confirm", "Comment"})
+    table.insert(help_line, {"󰌑  Confirm", "hopper.DisabledText"})
   end
   table.insert(help_line, {"  "})
   if self.suggested_keymap ~= nil then
     table.insert(help_line, {"󰌒 ", "String"})
     table.insert(help_line, {" Accept suggestion"})
   else
-    table.insert(help_line, {"󰌒  Accept suggestion", "Comment"})
+    table.insert(help_line, {"󰌒  Accept suggestion", "hopper.DisabledText"})
   end
   if self.on_back ~= nil then
     table.insert(help_line, {"  "})
@@ -263,7 +263,7 @@ function Keymapper:draw_footer()
       table.insert(help_line, {"󰁮 ", "Warning"})
       table.insert(help_line, {" Back"})
     else
-      table.insert(help_line, {"󰁮  Back", "Comment"})
+      table.insert(help_line, {"󰁮  Back", "hopper.DisabledText"})
     end
   end
   table.insert(lines, help_line)

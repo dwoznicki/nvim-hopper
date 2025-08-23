@@ -152,7 +152,7 @@ function Jumper:draw()
   local used = string.len(value)
   vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
     virt_text = {
-      {string.format("%d/%d", used, self.keymap_length), "Comment"}
+      {string.format("%d/%d", used, self.keymap_length), "hopper.DisabledText"}
     },
     virt_text_pos = "right_align",
   })
@@ -179,22 +179,22 @@ function Jumper:draw_footer()
   local help_line = {{" "}} ---@type string[][]
   local curr_mode = vim.api.nvim_get_mode().mode
   if curr_mode == "n" then
-    table.insert(help_line, {"k", "Function"})
+    table.insert(help_line, {"k", "hopper.ActionText"})
     table.insert(help_line, {" Keymap"})
     table.insert(help_line, {"  "})
-    table.insert(help_line, {"p", "Function"})
+    table.insert(help_line, {"p", "hopper.ActionText"})
     table.insert(help_line, {" Project"})
   else
-    table.insert(help_line, {"k Keymap", "Comment"})
+    table.insert(help_line, {"k Keymap", "hopper.DisabledText"})
     table.insert(help_line, {"  "})
-    table.insert(help_line, {"p Project", "Comment"})
+    table.insert(help_line, {"p Project", "hopper.DisabledText"})
   end
   vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_text = help_line,
     virt_text_pos = "overlay",
   })
 
-  local project_line = {{" " .. self.project.name .. " ", "hopper.hl.ProjectTag"}, {" "}}
+  local project_line = {{" " .. self.project.name .. " ", "hopper.ProjectTag"}, {" "}}
   vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_text = project_line,
     virt_text_pos = "right_align",

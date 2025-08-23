@@ -85,7 +85,7 @@ function InfoOverlay:open(opts)
   }
   local footer_win = vim.api.nvim_open_win(footer_buf, false, footer_win_config)
 
-  vim.api.nvim_set_option_value("winhighlight", "Normal:hopper.hl.FloatFooter", {win = footer_win})
+  vim.api.nvim_set_option_value("winhighlight", "Normal:hopper.FloatFooter", {win = footer_win})
 
   self.buf = buf
   self.win = win

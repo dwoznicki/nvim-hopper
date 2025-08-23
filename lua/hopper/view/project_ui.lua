@@ -101,7 +101,7 @@ function NewProjectForm:open(opts)
   local win = vim.api.nvim_open_win(buf, true, win_config)
   -- Create two empty lines in buffer.
   utils.clamp_buffer_value_lines(buf, 2, {exact = true})
-  local statuscolumn_vimscript = "%#hopper.hl.ProjectText#%{v:lnum==1?'Name ':v:lnum==2?'Path ':'     '}%*"
+  local statuscolumn_vimscript = "%#hopper.ProjectText#%{v:lnum==1?'Name ':v:lnum==2?'Path ':'     '}%*"
   vim.api.nvim_set_option_value("statuscolumn", statuscolumn_vimscript, {win = win})
 
   local footer_buf = vim.api.nvim_create_buf(false, true)
@@ -174,17 +174,17 @@ function NewProjectForm:draw_footer()
   local help_line = {{"  "}} ---@type string[][]
   local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
   if has_values then
-    table.insert(help_line, {"󰌑 ", "Function"})
+    table.insert(help_line, {"󰌑 ", "hopper.ActionText"})
     table.insert(help_line, {" Confirm"})
   else
-    table.insert(help_line, {"󰌑  Confirm", "Comment"})
+    table.insert(help_line, {"󰌑  Confirm", "hopper.DisabledText"})
   end
   table.insert(help_line, {"  "})
   if self.suggested_project ~= nil then
     table.insert(help_line, {"󰌒 ", "String"})
     table.insert(help_line, {" Accept suggestion"})
   else
-    table.insert(help_line, {"󰌒  Accept suggestion", "Comment"})
+    table.insert(help_line, {"󰌒  Accept suggestion", "hopper.DisabledText"})
   end
   table.insert(lines, help_line)
 
@@ -391,11 +391,11 @@ function NewProjectForm:_suggest_project()
       if string.len(self.name) < 1 and string.len(self.path) < 1 then
         self.suggested_project = suggested_project
         vim.api.nvim_buf_set_extmark(self.buf, self.ns, 0, 0, {
-          virt_text = {{suggested_project.name, "Comment"}},
+          virt_text = {{suggested_project.name, "hopper.DisabledText"}},
           virt_text_pos = "overlay",
         })
         vim.api.nvim_buf_set_extmark(self.buf, self.ns, 1, 0, {
-          virt_text = {{suggested_project.path, "Comment"}},
+          virt_text = {{suggested_project.path, "hopper.DisabledText"}},
           virt_text_pos = "overlay",
         })
         self:draw_footer()

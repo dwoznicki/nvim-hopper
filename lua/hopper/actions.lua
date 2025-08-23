@@ -3,10 +3,6 @@ local projects = require("hopper.projects")
 
 local M = {}
 
--- =================
--- = Lua functions =
--- =================
-
 function M.toggle_jumper()
   local float = require("hopper.view.jumper").float()
   if float.is_open then

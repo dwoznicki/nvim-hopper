@@ -19,40 +19,6 @@ M.keysets = {
   },
 }
 
----@param keymap_locations integer[][]
----@param location integer[]
----@return boolean
-local function location_already_referenced(keymap_locations, location)
-  for _, loc in ipairs(keymap_locations) do
-    if loc[1] == location[1] and loc[2] == location[2] then
-      return true
-    end
-  end
-  return false
-end
-
-
----@param tried_char_indexes integer[]
----@param chars string[]
----@param char_idx integer
----@return integer index or -1 to indicate we're out of viable options
-local function get_next_char_index(tried_char_indexes, chars, char_idx)
-  local next_char_idx = char_idx
-  while true do
-    next_char_idx = next_char_idx + 1
-    if next_char_idx > #chars then
-      next_char_idx = 1
-    end
-    if next_char_idx == char_idx then
-      return -1
-    end
-    -- if tried_char_indexes[next_char_idx] == nil then
-    if not vim.tbl_contains(tried_char_indexes, next_char_idx) then
-      return next_char_idx
-    end
-  end
-end
-
 ---@param path string | string[]
 ---@param num_path_tokens_to_check integer
 ---@param keymap_length integer
@@ -210,161 +176,6 @@ function M.keymap_for_path(path, num_path_tokens_to_check, keymap_length, allowe
     return available_keymaps[1]
   end
   error("Unable to find keymap for path. All keymap combinations appear to be in use.")
-
-
-
-
-
---   local tried_key_combinations = {} ---@type table<string, true>
---   local tried_char_indexes = {} ---@type integer[]
---   local closest_combination = ""
---   local keymap = ""
---   local keymap_locations = {} ---@type integer[][]
---   -- local path_idx = #tokenized_path
---   -- local char_idx = 1
---
---   while true do
---     local chars = tokenized_path[path_idx]
---     if chars ~= nil then
---       local char = chars[char_idx]
---       if char ~= nil then
---         char = string.lower(char)
---         local location = {path_idx, char_idx}
---         if allowed_keys[char] ~= nil and not location_already_referenced(keymap_locations, location) then
---           local next_combination = keymap .. char
---           if tried_key_combinations[next_combination] == nil
---             and assigned_keymaps[next_combination] == nil
---           then
---             keymap = next_combination
---             table.insert(keymap_locations, location)
---             if string.len(next_combination) > string.len(closest_combination) then
---               -- Don't override existing closest combinations with new ones unless the new version
---               -- actually includes more characters. We assume that earlier attempts are "better"
---               -- than later attempts.
---               closest_combination = next_combination
---             end
---             if string.len(keymap) >= keymap_length then
---               -- Success!
---               return next_combination
---             end
---             tried_key_combinations[next_combination] = true
---             tried_char_indexes = {}
---           end
---         end
---         table.insert(tried_char_indexes, char_idx)
---         char_idx = get_next_char_index(tried_char_indexes, chars, char_idx)
---       else
---         -- We're out of characters to check. Move on to the prior path part.
---         path_idx = path_idx - 1
---         if path_idx < math.max(#tokenized_path - num_path_tokens_to_check, 1) then
---           -- Give up after we've checked some number of path tokens, based on the number specified
---           -- by `num_path_tokens_to_check.
---           --
---           -- For example,
---           -- path = "/path/to/some/random/file.txt"
---           -- num_path_tokens_to_check = 2
---           --
---           -- "path", "to", "some", ⏐ "random", "file.txt"
---           --                       ⏐
---           --       unchecked       ⏐       checked
---           path_idx = -1
---         end
---         tried_char_indexes = {}
---         char_idx = 1
---       end
---     else
---       -- We're out of valid path parts to check.
---       if path_idx == -1 then
---         -- We've run out of possible character combinations for this file path.
---         break
---       else
---         -- Pop off the last character we chose, and take another swing.
---         keymap = string.sub(keymap, 1, -2)
---         table.remove(keymap_locations, #keymap_locations)
---         path_idx = #tokenized_path
---         char_idx = 1
---       end
---     end
---   end
---   -- If we've reached this point, we failed to produce a good keymap using characters from the file
---   -- path. It's time to start making random selections.
---   keymap = closest_combination
---   while true do
---     local before_keymap_length = string.len(keymap)
---     for char, _ in pairs(allowed_keys) do
---       local next_combination = closest_combination .. char
---       if assigned_keymaps[next_combination] == nil then
---         keymap = next_combination
---         break
---       end
---     end
---     if string.len(keymap) >= keymap_length then
---       return keymap
---     end
---     local after_keymap_length = string.len(keymap)
---     if after_keymap_length == before_keymap_length then
---       if after_keymap_length == 1 then
---         -- We can't find any keymaps that look any good using characters from the file path.
---         break
---       end
---       -- We've hit a dead end with this combination so far. Try popping off the last character and
---       -- see if we can get anywhere.
---       keymap = string.sub(keymap, 1, -2)
---     end
---   end
---   -- We've failed to find a good key combination using file path characters. Time to see if there
---   -- are any free combinations whatsoever that could work.
---   if #available_keymaps > 0 then
---     return available_keymaps[1]
---   end
---   error("Unable to find keymap for path. All keymap combinations appear to be in use.")
--- end
---
--- ---@param existing_keymaps table<string, true>
--- ---@param allowed_keys table<string, true>
--- ---@param keymap_length integer
--- ---@return string[] available_keymaps
--- function M.list_available_keymaps(existing_keymaps, allowed_keys, keymap_length)
---   local num_allowed_keys = #allowed_keys
---   -- local total_keymap_permutions = num_allowed_keys ^ keymap_length
---   local num_tried = 0
---   local available_keymaps = {} ---@type string[]
---   local this_keymap_indexes = {} ---@type integer[]
---   for _ = 1, keymap_length do
---     table.insert(this_keymap_indexes, 1)
---   end
---   local incr_index = #this_keymap_indexes
---
---   while true do
---     local keymap = ""
---     for _, idx in ipairs(this_keymap_indexes) do
---       keymap = keymap .. allowed_keys[idx]
---     end
---     if not existing_keymaps[keymap] then
---       table.insert(available_keymaps, keymap)
---     end
---     num_tried = num_tried + 1
---     -- if num_tried % 50 == 0 or num_tried >= total_keymap_permutions then
---     --   schedule_draw_progress(num_tried, #available_keymaps, total_keymap_permutions)
---     -- end
---     while true do
---       this_keymap_indexes[incr_index] = this_keymap_indexes[incr_index] + 1
---       if this_keymap_indexes[incr_index] > num_allowed_keys then
---         this_keymap_indexes[incr_index] = 1
---         incr_index = incr_index - 1
---         if incr_index < 1 then
---           break
---         end
---       else
---         incr_index = #this_keymap_indexes
---         break
---       end
---     end
---     if incr_index < 1 then
---       break
---     end
---   end
---   return available_keymaps
 end
 
 ---@param path string
@@ -538,38 +349,38 @@ function M.highlight_path_virtual_text(path, keymap, keymap_indexes, opts)
     if idx == keymap_indexes[1] then
       key = string.sub(keymap, 1, 1)
       if next_key_index == 1 then
-        hl_name = "hopper.hl.FirstKeyNext"
+        hl_name = "hopper.FirstKeyNext"
       else
-        hl_name = "hopper.hl.FirstKey"
+        hl_name = "hopper.FirstKey"
       end
     elseif idx == keymap_indexes[2] then
       key = string.sub(keymap, 2, 2)
       if next_key_index == 2 then
-        hl_name = "hopper.hl.SecondKeyNext"
+        hl_name = "hopper.SecondKeyNext"
       else
-        hl_name = "hopper.hl.SecondKey"
+        hl_name = "hopper.SecondKey"
       end
     elseif idx == keymap_indexes[3] then
       key = string.sub(keymap, 3, 3)
       if next_key_index == 3 then
-        hl_name = "hopper.hl.ThirdKeyNext"
+        hl_name = "hopper.ThirdKeyNext"
       else
-        hl_name = "hopper.hl.ThirdKey"
+        hl_name = "hopper.ThirdKey"
       end
     elseif idx == keymap_indexes[4] then
       key = string.sub(keymap, 4, 4)
       if next_key_index == 4 then
-        hl_name = "hopper.hl.FourthKeyNext"
+        hl_name = "hopper.FourthKeyNext"
       else
-        hl_name = "hopper.hl.FourthKey"
+        hl_name = "hopper.FourthKey"
       end
     end
-    table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})
+    table.insert(highlighted_parts, {part, "hopper.MutedText"})
     table.insert(highlighted_parts, {key, hl_name})
     start_idx = idx + 1
   end
   local part = string.sub(path, start_idx)
-  table.insert(highlighted_parts, {part, "hopper.hl.SecondaryText"})
+  table.insert(highlighted_parts, {part, "hopper.MutedText"})
   return highlighted_parts
 end
 
