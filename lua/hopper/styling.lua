@@ -1,13 +1,4 @@
----@class hopper.ColorPalette
----@field default_background string
----@field muted string
----@field disabled string
----@field project string
----@field action string
----@field first_key string
----@field second_key string
----@field third_key string
----@field fourth_key string
+local options = require("hopper.options")
 
 local M = {}
 
@@ -76,8 +67,8 @@ local function blend_hex(fg, bg, a)
   return string.format("#%02X%02X%02X", r, g, b)
 end
 
-
 local function setup_higlights()
+  local color_opts = options.options().colors
   local fg_color = color_fg("Normal")
   if not fg_color then
     fg_color = vim.o.background == "light" and "#000000" or "#ffffff"
@@ -86,12 +77,12 @@ local function setup_higlights()
   if not bg_color then
     bg_color = vim.o.background == "light" and "#ffffff" or "#000000"
   end
-  local project_color = color_fg("Statement")
-  local action_color = color_fg("Function")
-  local first_key_color = color_fg("Exception")
-  local second_key_color = color_fg("Special")
-  local third_key_color = color_fg("Identifier")
-  local fourth_key_color = color_fg("String")
+  local project_color = color_opts.project or color_fg("Statement")
+  local action_color = color_opts.action or color_fg("Function")
+  local first_key_color = color_opts.first_key or color_fg("Exception")
+  local second_key_color = color_opts.second_key or color_fg("Special")
+  local third_key_color = color_opts.third_key or color_fg("Identifier")
+  local fourth_key_color = color_opts.fourth_key or color_fg("String")
   vim.api.nvim_set_hl(0, "hopper.MutedText", {fg = blend_hex(fg_color, bg_color, 0.7)})
   vim.api.nvim_set_hl(0, "hopper.DisabledText", {link = "Comment"})
   vim.api.nvim_set_hl(0, "hopper.ProjectText", {fg = project_color})

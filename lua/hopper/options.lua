@@ -3,12 +3,25 @@ local keymaps = require("hopper.keymaps")
 
 local M = {}
 
---- ========== Input Options ==========
+---@class hopper.ColorPalette
+---@field muted string | nil
+---@field disabled string | nil
+---@field project string | nil
+---@field action string | nil
+---@field first_key string | nil
+---@field second_key string | nil
+---@field third_key string | nil
+---@field fourth_key string | nil
+
+-- =================
+-- = Input Options =
+-- =================
 
 ---@class hopper.Options
 ---@field keymapping hopper.KeymappingOptions | nil
 ---@field db hopper.DatabaseOptions | nil
 ---@field float hopper.FloatOptions | nil
+---@field colors hopper.ColorPalette | nil
 
 ---@class hopper.KeymappingOptions
 ---@field keyset string | string[] | nil
@@ -23,12 +36,15 @@ local M = {}
 ---@field width integer | decimal | nil
 ---@field height integer | decimal | nil
 
---- ========== Resolved Options ==========
+-- ====================
+-- = Resolved Options =
+-- ====================
 
 ---@class hopper.ResolvedOptions
 ---@field keymapping hopper.ResolvedKeymappingOptions
 ---@field db hopper.ResolvedDatabaseOptions
 ---@field float hopper.ResolvedFloatOptions
+---@field colors hopper.ColorPalette
 
 ---@class hopper.ResolvedKeymappingOptions
 ---@field keyset string[]
@@ -57,6 +73,7 @@ local _default_options = { ---@type hopper.ResolvedOptions
     width = 0.6,
     height = 0.6,
   },
+  colors = {}, -- Derived after colorscheme loads.
 }
 
 local _options = nil ---@type hopper.ResolvedOptions | nil
