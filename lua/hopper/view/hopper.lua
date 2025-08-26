@@ -8,7 +8,7 @@ local M = {}
 ---@alias hopper.KeymapFileTree table<string, hopper.KeymapFileNode>
 ---@alias hopper.KeymapFileNode hopper.KeymapFileTree | hopper.FileMapping
 
----@class hopper.Jumper
+---@class hopper.Hopper
 ---@field project hopper.Project | nil
 ---@field files hopper.FileMapping[]
 ---@field is_open boolean
@@ -22,23 +22,23 @@ local M = {}
 ---@field prior_buf integer
 ---@field keymap_length integer
 ---@field open_cmd string | nil
-local Jumper = {}
-Jumper.__index = Jumper
-M.Jumper = Jumper
+local Hopper = {}
+Hopper.__index = Hopper
+M.Hopper = Hopper
 
-Jumper.ns = vim.api.nvim_create_namespace("hopper.Jumper")
-Jumper.footer_ns = vim.api.nvim_create_namespace("hopper.JumperFooter")
+Hopper.ns = vim.api.nvim_create_namespace("hopper.Hopper")
+Hopper.footer_ns = vim.api.nvim_create_namespace("hopper.HopperFooter")
 
----@return hopper.Jumper
-function Jumper._new()
+---@return hopper.Hopper
+function Hopper._new()
   local float = {}
-  setmetatable(float, Jumper)
-  Jumper._reset(float)
+  setmetatable(float, Hopper)
+  Hopper._reset(float)
   return float
 end
 
----@param float hopper.Jumper
-function Jumper._reset(float)
+---@param float hopper.Hopper
+function Hopper._reset(float)
   float.project = nil
   float.files = {}
   float.is_open = false
@@ -54,7 +54,7 @@ function Jumper._reset(float)
   float.open_cmd = nil
 end
 
----@class hopper.OpenJumperOptions
+---@class hopper.OpenHopperOptions
 ---@field project hopper.Project | string | nil
 ---@field prior_buf integer | nil
 ---@field keymap_length integer | nil
@@ -62,8 +62,8 @@ end
 ---@field width integer | decimal | nil
 ---@field height integer | decimal | nil
 
----@param opts? hopper.OpenJumperOptions
-function Jumper:open(opts)
+---@param opts? hopper.OpenHopperOptions
+function Hopper:open(opts)
   opts = opts or {}
   local full_options = options.options()
   self.project = projects.ensure_project(opts.project)
@@ -129,7 +129,7 @@ function Jumper:open(opts)
     col = win_config.col + 1,
     focusable = false,
     border = "none",
-    zindex = 51, -- Just enough to site on top of the jumper window.
+    zindex = 51, -- Just enough to site on top of the hopper window.
   }
   local footer_win = vim.api.nvim_open_win(footer_buf, false, footer_win_config)
 
@@ -145,7 +145,7 @@ function Jumper:open(opts)
   self:draw_footer()
 end
 
-function Jumper:draw()
+function Hopper:draw()
   vim.api.nvim_buf_clear_namespace(self.buf, self.ns, 0, -1) -- clear highlights
 
   local value = vim.api.nvim_buf_get_lines(self.buf, 0, 1, false)[1] or ""
@@ -174,7 +174,7 @@ function Jumper:draw()
   })
 end
 
-function Jumper:draw_footer()
+function Hopper:draw_footer()
   vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
   local help_line = {{" "}} ---@type string[][]
   local curr_mode = vim.api.nvim_get_mode().mode
@@ -201,22 +201,22 @@ function Jumper:draw_footer()
   })
 end
 
-function Jumper:close()
+function Hopper:close()
   if vim.api.nvim_win_is_valid(self.win) then
     vim.api.nvim_win_close(self.win, true)
   end
   if vim.api.nvim_win_is_valid(self.footer_win) then
     vim.api.nvim_win_close(self.footer_win, true)
   end
-  Jumper._reset(self)
+  Hopper._reset(self)
 end
 
----@class hopper.NewReopenJumperOptions
+---@class hopper.NewReopenHopperOptions
 ---@field project_source "self" | "current"
 
----@param opts? hopper.NewReopenJumperOptions
+---@param opts? hopper.NewReopenHopperOptions
 ---@return fun(el?: hopper.Keymapper | hopper.NewProjectForm)
-function Jumper:_new_reopen_callback(opts)
+function Hopper:_new_reopen_callback(opts)
   opts = opts or {}
   local prior_buf = self.prior_buf
   local project = self.project
@@ -235,7 +235,7 @@ end
 -- Set the list of files, including building out a tree of keymaps to file paths. This tree is
 -- important when determining whether a file keymapping has been activated during the text change
 -- handler.
-function Jumper:_set_files(files)
+function Hopper:_set_files(files)
   local tree = {} ---@type hopper.KeymapFileTree
   for _, file in ipairs(files) do
     local node = tree ---@type hopper.KeymapFileNode | hopper.KeymapFileTree
@@ -256,7 +256,7 @@ function Jumper:_set_files(files)
   self.keymap_file_tree = tree
 end
 
-function Jumper:_attach_event_handlers()
+function Hopper:_attach_event_handlers()
   local buf = self.buf
 
   vim.api.nvim_create_autocmd({"TextChangedI", "TextChanged", "TextChangedP"}, {
@@ -341,13 +341,13 @@ function Jumper:_attach_event_handlers()
     "k",
     function()
       local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
-      local reopen_jumper = self:_new_reopen_callback()
+      local reopen_hopper = self:_new_reopen_callback()
       require("hopper.view.keymapper").form():open(
         path,
         {
           project = self.project,
-          on_back = reopen_jumper,
-          on_keymap_set = reopen_jumper,
+          on_back = reopen_hopper,
+          on_keymap_set = reopen_hopper,
         }
       )
     end,
@@ -358,11 +358,11 @@ function Jumper:_attach_event_handlers()
     "n",
     "p",
     function()
-      local reopen_jumper = self:_new_reopen_callback({project_source = "current"})
+      local reopen_hopper = self:_new_reopen_callback({project_source = "current"})
       require("hopper.view.project_ui").open_project_menu({
-        on_new_project_created = reopen_jumper,
-        on_current_project_changed = reopen_jumper,
-        on_project_deleted = reopen_jumper,
+        on_new_project_created = reopen_hopper,
+        on_current_project_changed = reopen_hopper,
+        on_project_deleted = reopen_hopper,
       })
     end,
     {noremap = true, silent = true, nowait = true, buffer = buf}
@@ -378,12 +378,12 @@ function Jumper:_attach_event_handlers()
   })
 end
 
-local _float = nil ---@type hopper.Jumper | nil
+local _float = nil ---@type hopper.Hopper | nil
 
----@return hopper.Jumper
+---@return hopper.Hopper
 function M.float()
   if _float == nil then
-    _float = Jumper._new()
+    _float = Hopper._new()
   end
   return _float
 end

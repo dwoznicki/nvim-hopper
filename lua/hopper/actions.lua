@@ -3,8 +3,8 @@ local projects = require("hopper.projects")
 
 local M = {}
 
-function M.toggle_jumper()
-  local float = require("hopper.view.jumper").float()
+function M.toggle_hopper()
+  local float = require("hopper.view.hopper").float()
   if float.is_open then
     float:close()
   else

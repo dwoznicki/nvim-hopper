@@ -9,7 +9,7 @@ function M.setup(options)
   require("hopper.styling").setup()
 end
 
-M.toggle_jumper = actions.toggle_jumper
+M.toggle_hopper = actions.toggle_hopper
 M.toggle_keymapper = actions.toggle_keymapper
 M.toggle_info = actions.toggle_info
 M.save_project = actions.save_project
