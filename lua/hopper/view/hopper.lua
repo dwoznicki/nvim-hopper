@@ -6,14 +6,14 @@ local options = require("hopper.options")
 local M = {}
 
 ---@alias hopper.KeymapFileTree table<string, hopper.KeymapFileNode>
----@alias hopper.KeymapFileNode hopper.KeymapFileTree | hopper.FileMapping
+---@alias hopper.KeymapFileNode hopper.KeymapFileTree | hopper.FileKeymap
 
 ---@class hopper.Hopper
 ---@field project hopper.Project | nil
----@field files hopper.FileMapping[]
+---@field files hopper.FileKeymap[]
 ---@field is_open boolean
 ---@field keymap_file_tree hopper.KeymapFileTree
----@field filtered_files hopper.FileMapping[]
+---@field filtered_files hopper.FileKeymap[]
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer
@@ -22,12 +22,19 @@ local M = {}
 ---@field prior_buf integer
 ---@field keymap_length integer
 ---@field open_cmd string | nil
+---@field action_open_keymapper string[]
+---@field action_open_project_menu string[]
+---@field action_close string[]
 local Hopper = {}
 Hopper.__index = Hopper
 M.Hopper = Hopper
 
 Hopper.ns = vim.api.nvim_create_namespace("hopper.Hopper")
 Hopper.footer_ns = vim.api.nvim_create_namespace("hopper.HopperFooter")
+Hopper.default_action_open_keymapper = {"k"}
+Hopper.default_action_open_project_menu = {"p"}
+Hopper.default_action_close = {"<esc>"}
+
 
 ---@return hopper.Hopper
 function Hopper._new()
@@ -52,6 +59,9 @@ function Hopper._reset(float)
   float.prior_buf = -1
   float.keymap_length = -1
   float.open_cmd = nil
+  float.action_open_keymapper = Hopper.default_action_open_keymapper
+  float.action_open_project_menu = Hopper.default_action_open_project_menu
+  float.action_close = Hopper.default_action_close
 end
 
 ---@class hopper.OpenHopperOptions
@@ -73,6 +83,11 @@ function Hopper:open(opts)
   if self.open_cmd ~= nil and string.len(self.open_cmd) < 1 then
     vim.notify_once(string.format('Open command "%s" is invalid.', self.open_cmd), vim.log.levels.WARN)
   end
+
+  local action_overrides = full_options.actions
+  self.action_open_keymapper = action_overrides.hopper_open_keymapper or Hopper.default_action_open_keymapper
+  self.action_open_project_menu = action_overrides.hopper_open_projects_menu or Hopper.default_action_open_project_menu
+  self.action_close = action_overrides.hopper_close or Hopper.default_action_close
 
   local ui = vim.api.nvim_list_uis()[1]
   local opts_width = opts.width or full_options.float.width
@@ -231,7 +246,7 @@ function Hopper:_new_reopen_callback(opts)
   end
 end
 
----@param files hopper.FileMapping[]
+---@param files hopper.FileKeymap[]
 -- Set the list of files, including building out a tree of keymaps to file paths. This tree is
 -- important when determining whether a file keymapping has been activated during the text change
 -- handler.
@@ -248,6 +263,8 @@ function Hopper:_set_files(files)
         ---@type any Can't handle recursive types like this.
         node[key] = file
       end
+      -- lua_ls doesn't do well with recursive types.
+      ---@diagnostic disable-next-line cast-local-type
       node = node[key]
     end
   end
@@ -288,7 +305,7 @@ function Hopper:_attach_event_handlers()
       --
       -- In this case, we'd expect the selected value for input "i" to be the table containing keys
       -- "l" and "v". The selected value for input "iv" would be the "init.vim" file mapping object.
-      local selected = vim.tbl_get(self.keymap_file_tree, unpack(vim.split(value, ""))) ---@type hopper.FileMapping | hopper.KeymapFileTree | nil
+      local selected = vim.tbl_get(self.keymap_file_tree, unpack(vim.split(value, ""))) ---@type hopper.FileKeymap | hopper.KeymapFileTree | nil
       if selected == nil then
         -- No selection found. Empty out the list and bail.
         self.filtered_files = {}
@@ -310,10 +327,10 @@ function Hopper:_attach_event_handlers()
         -- The selected object is another set of poossible next characters in the keymap.
         -- Filter the visible list down to only files that are possible to select from this keymap
         -- so far.
-        local filtered_files = {} ---@type hopper.FileMapping[]
-        local stack = vim.tbl_values(selected) ---@type (hopper.FileMapping | hopper.KeymapFileNode)[]
+        local filtered_files = {} ---@type hopper.FileKeymap[]
+        local stack = vim.tbl_values(selected) ---@type (hopper.FileKeymap | hopper.KeymapFileNode)[]
         while #stack > 0 do
-          local item = table.remove(stack, 1) ---@type hopper.FileMapping | hopper.KeymapFileNode
+          local item = table.remove(stack, 1) ---@type hopper.FileKeymap | hopper.KeymapFileNode
           if item.path then
             table.insert(filtered_files, item)
           else
@@ -335,45 +352,52 @@ function Hopper:_attach_event_handlers()
     end,
   })
 
-  -- Open new keymap view on "k" keypress.
-  vim.keymap.set(
-    "n",
-    "k",
-    function()
-      local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
-      local reopen_hopper = self:_new_reopen_callback()
-      require("hopper.view.keymapper").form():open(
-        path,
-        {
-          project = self.project,
-          on_back = reopen_hopper,
-          on_keymap_set = reopen_hopper,
-        }
-      )
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
-  -- Open project menu on "p" keypress.
-  vim.keymap.set(
-    "n",
-    "p",
-    function()
-      local reopen_hopper = self:_new_reopen_callback({project_source = "current"})
-      require("hopper.view.project_ui").open_project_menu({
-        on_new_project_created = reopen_hopper,
-        on_current_project_changed = reopen_hopper,
-        on_project_deleted = reopen_hopper,
-      })
-    end,
-    {noremap = true, silent = true, nowait = true, buffer = buf}
-  )
+  -- Open new keymapper view.
+  local function open_keymapper()
+    local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
+    local reopen_hopper = self:_new_reopen_callback()
+    require("hopper.view.keymapper").form():open(
+      path,
+      {
+        project = self.project,
+        on_back = reopen_hopper,
+        on_keymap_set = reopen_hopper,
+      }
+    )
+  end
+  for _, keymap in ipairs(self.action_open_keymapper) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      open_keymapper,
+      {noremap = true, silent = true, nowait = true, buffer = buf}
+    )
+  end
+
+  -- Open project menu view.
+  local function open_project_menu()
+    local reopen_hopper = self:_new_reopen_callback({project_source = "current"})
+    require("hopper.view.project_ui").open_project_menu({
+      on_new_project_created = reopen_hopper,
+      on_current_project_changed = reopen_hopper,
+      on_project_deleted = reopen_hopper,
+    })
+  end
+  for _, keymap in ipairs(self.action_open_project_menu) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      open_project_menu,
+      {noremap = true, silent = true, nowait = true, buffer = buf}
+    )
+  end
 
   utils.attach_close_events({
     buffer = buf,
     on_close = function()
       self:close()
     end,
-    keypress_events = {"<esc>"},
+    keypress_events = self.action_close,
     vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end

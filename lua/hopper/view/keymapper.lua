@@ -20,7 +20,7 @@ local M = {}
 ---@field path string
 ---@field keymap string
 ---@field is_open boolean
----@field existing_file hopper.FileMapping | nil
+---@field existing_file hopper.FileKeymap | nil
 ---@field buf integer
 ---@field win integer
 ---@field win_width integer

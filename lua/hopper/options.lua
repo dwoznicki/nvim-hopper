@@ -8,6 +8,7 @@ local M = {}
 ---@field db hopper.ResolvedDatabaseOptions
 ---@field float hopper.ResolvedFloatOptions
 ---@field colors hopper.ColorPalette
+---@field actions hopper.ActionOverrides
 
 ---@class hopper.ResolvedKeymappingOptions
 ---@field keyset string[]
@@ -21,6 +22,18 @@ local M = {}
 ---@class hopper.ResolvedFloatOptions
 ---@field width integer | decimal
 ---@field height integer | decimal
+
+---@class hopper.ActionOverrides
+---@field hopper_open_keymapper string[] | nil
+---@field hopper_open_projects_menu string[] | nil
+---@field hopper_close string[] | nil
+---@field keymapper_confirm string[] | nil
+---@field keymapper_accept_suggestion string[] | nil
+---@field keymapper_go_back string[] | nil
+---@field keymapper_close string[] | nil
+---@field new_project_confirm string[] | nil
+---@field new_project_accept_suggestion string[] | nil
+---@field new_project_close string[] | nil
 
 local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
@@ -37,6 +50,7 @@ local _default_options = { ---@type hopper.ResolvedOptions
     height = 0.6,
   },
   colors = {}, -- Derived after colorscheme loads.
+  actions = {}, -- No overrides by default.
 }
 
 local _options = nil ---@type hopper.ResolvedOptions | nil
@@ -88,6 +102,21 @@ local function normalize_and_validate_options(opts)
         error(string.format("`options.keymapping.length` must be a valid integer between 1 and 4. Instead got: %s", keymapping_length))
       end
     end
+  end
+  if opts.actions ~= nil then
+    local actions = opts.actions ---@type table<string, string | string[] | nil>
+    local action_overrides = {} ---@type hopper.ActionOverrides
+    for action, keys in pairs(actions) do
+      if type(keys) == "string" then
+        action_overrides[action] = {keys}
+      else
+        action_overrides[action] = keys
+      end
+    end
+    -- lua_ls doesn't appear to be smart enough to understand that hopper.ActionOverrides is a valid
+    -- subset of hopper.ActionOptions.
+    ---@diagnostic disable-next-line assign-type-mismatch
+    opts.actions = action_overrides
   end
 end
 

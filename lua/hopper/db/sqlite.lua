@@ -348,9 +348,6 @@ function SqlDatastore:init()
   self.create_file_keymaps_project_idx_stmt:exec_update()
 end
 
----@alias hopper.Project {name: string, path: string}
----@alias hopper.FileMapping {id: integer, project: string, path: string, keymap: string}
-
 ---@return hopper.Project[]
 function SqlDatastore:list_projects()
   if self.select_projects_stmt == nil then
@@ -453,7 +450,7 @@ end
 
 ---@param project? string Optionally filer by project.
 ---@param keymap_length? integer Optionally filter by keymap length.
----@return hopper.FileMapping[]
+---@return hopper.FileKeymap[]
 function SqlDatastore:list_file_keymaps(project, keymap_length)
   local results ---@type string[][]
   if project ~= nil and keymap_length ~= nil then
@@ -485,7 +482,7 @@ function SqlDatastore:list_file_keymaps(project, keymap_length)
     end
     results = self.select_files_stmt:exec_query()
   end
-  local files = {} ---@type hopper.FileMapping[]
+  local files = {} ---@type hopper.FileKeymap[]
   for _, result in ipairs(results) do
     table.insert(files, {
       id = result[1],
@@ -515,7 +512,7 @@ end
 
 ---@param project string
 ---@param keymap string
----@return hopper.FileMapping | nil
+---@return hopper.FileKeymap | nil
 function SqlDatastore:get_file_keymap_by_keymap(project, keymap)
   if self.select_file_by_keymap_stmt == nil then
     self.select_file_by_keymap_stmt = PreparedStatement.new([[
@@ -536,7 +533,7 @@ end
 
 ---@param project string
 ---@param path string
----@return hopper.FileMapping | nil
+---@return hopper.FileKeymap | nil
 function SqlDatastore:get_file_keymap_by_path(project, path)
   if self.select_file_by_path_stmt == nil then
     self.select_file_by_path_stmt = PreparedStatement.new([[

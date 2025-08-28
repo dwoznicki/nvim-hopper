@@ -133,7 +133,7 @@ end
 ---@param path string
 ---@param keymap string
 ---@param opts? hopper.SaveFileKeymapOptions
----@return hopper.FileMapping
+---@return hopper.FileKeymap
 function M.save_file_keymap(keymap, path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
