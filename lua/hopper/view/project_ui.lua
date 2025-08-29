@@ -419,16 +419,25 @@ function M.form()
   return _form
 end
 
+---@class hopper.ListAvailableProjectItemsOptions
+---@field mode "saved_only" | nil
+
+---@param opts? hopper.ListAvailableProjectItemsOptions
 ---@return hopper.Project[]
-local function list_available_project_items()
+local function list_available_project_items(opts)
+  opts = opts or {}
+  local mode = opts.mode
+
   local added_names = {} ---@type table<string, true>
   local project_items = {} ---@type hopper.Project[]
 
-  local projects_from_path = projects.list_projects_from_path(vim.api.nvim_buf_get_name(0))
-  for _, project in ipairs(projects_from_path) do
-    if added_names[project.name] == nil then
-      table.insert(project_items, project)
-      added_names[project.name] = true
+  if mode ~= "saved_only" then
+    local projects_from_path = projects.list_projects_from_path(vim.api.nvim_buf_get_name(0))
+    for _, project in ipairs(projects_from_path) do
+      if added_names[project.name] == nil then
+        table.insert(project_items, project)
+        added_names[project.name] = true
+      end
     end
   end
 
@@ -476,7 +485,7 @@ end
 ---@param opts? hopper.DeleteProjectOptions
 function M.delete_project(opts)
   opts = opts or {}
-  local project_items = list_available_project_items()
+  local project_items = list_available_project_items({mode = "saved_only"})
 
   vim.ui.select(
     project_items,
@@ -488,9 +497,24 @@ function M.delete_project(opts)
     },
     function(choice)
       if choice ~= nil then
+        local curr_project = projects.current_project()
         local datastore = require("hopper.db").datastore()
         datastore:remove_project(choice.name)
         vim.notify(string.format("Project %s deleted.", choice.name))
+        if choice.name == curr_project.name then
+          -- Just deleted our current project. Find a new project to serve as the current.
+          local next_projects = projects.list_projects_from_path(loop.cwd())
+          if #next_projects > 0 then
+            projects.set_current_project(next_projects[1])
+          else
+            for _, project in ipairs(project_items) do
+              if project.name ~= choice.name then
+                projects.set_current_project(project)
+                break
+              end
+            end
+          end
+        end
         if opts.on_deleted ~= nil then
           opts.on_deleted()
         end

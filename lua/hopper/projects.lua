@@ -106,7 +106,7 @@ end
 function M.current_project()
   if _curr_project == nil then
     local base_path = vim.api.nvim_buf_get_name(0)
-    if not base_path then
+    if string.len(base_path) < 1 then
       base_path = loop.cwd()
     end
     local projects = M.list_projects_from_path(base_path)
