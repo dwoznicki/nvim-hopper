@@ -23,6 +23,7 @@ local M = {}
 ---@field keymap_length integer
 ---@field open_cmd string | nil
 ---@field action_open_keymapper string[]
+---@field action_open_picker string[]
 ---@field action_open_project_menu string[]
 ---@field action_close string[]
 local Hopper = {}
@@ -32,6 +33,7 @@ M.Hopper = Hopper
 Hopper.ns = vim.api.nvim_create_namespace("hopper.Hopper")
 Hopper.footer_ns = vim.api.nvim_create_namespace("hopper.HopperFooter")
 Hopper.default_action_open_keymapper = {"k"}
+Hopper.default_action_open_picker = {"j"}
 Hopper.default_action_open_project_menu = {"p"}
 Hopper.default_action_close = {"<esc>"}
 
@@ -60,6 +62,7 @@ function Hopper._reset(float)
   float.keymap_length = -1
   float.open_cmd = nil
   float.action_open_keymapper = Hopper.default_action_open_keymapper
+  float.action_open_picker = Hopper.default_action_open_picker
   float.action_open_project_menu = Hopper.default_action_open_project_menu
   float.action_close = Hopper.default_action_close
 end
@@ -76,6 +79,7 @@ end
 function Hopper:open(opts)
   opts = opts or {}
   local full_options = options.options()
+  -- Initial setup
   self.project = projects.ensure_project(opts.project)
   self.prior_buf = opts.prior_buf or vim.api.nvim_get_current_buf()
   self.keymap_length = opts.keymap_length or full_options.keymapping.length
@@ -84,8 +88,10 @@ function Hopper:open(opts)
     vim.notify_once(string.format('Open command "%s" is invalid.', self.open_cmd), vim.log.levels.WARN)
   end
 
+  -- Action keymaps
   local action_overrides = full_options.actions
   self.action_open_keymapper = action_overrides.hopper_open_keymapper or Hopper.default_action_open_keymapper
+  self.action_open_picker = action_overrides.hopper_open_picker or Hopper.default_action_open_picker
   self.action_open_project_menu = action_overrides.hopper_open_projects_menu or Hopper.default_action_open_project_menu
   self.action_close = action_overrides.hopper_close or Hopper.default_action_close
 
@@ -197,10 +203,15 @@ function Hopper:draw_footer()
     table.insert(help_line, {"k", "hopper.ActionText"})
     table.insert(help_line, {" Keymap"})
     table.insert(help_line, {"  "})
+    table.insert(help_line, {"j", "hopper.ActionText"})
+    table.insert(help_line, {" Picker"})
+    table.insert(help_line, {"  "})
     table.insert(help_line, {"p", "hopper.ActionText"})
     table.insert(help_line, {" Project"})
   else
     table.insert(help_line, {"k Keymap", "hopper.DisabledText"})
+    table.insert(help_line, {"  "})
+    table.insert(help_line, {"j Picker", "hopper.DisabledText"})
     table.insert(help_line, {"  "})
     table.insert(help_line, {"p Project", "hopper.DisabledText"})
   end
@@ -370,6 +381,21 @@ function Hopper:_attach_event_handlers()
       "n",
       keymap,
       open_keymapper,
+      {noremap = true, silent = true, nowait = true, buffer = buf}
+    )
+  end
+
+  -- Open picker view.
+  local function open_file_keymaps_picker()
+    require("hopper.view.picker").open_file_keymaps_picker({
+      project_filter = self.project.name,
+    })
+  end
+  for _, keymap in ipairs(self.action_open_picker) do
+    vim.keymap.set(
+      "n",
+      keymap,
+      open_file_keymaps_picker,
       {noremap = true, silent = true, nowait = true, buffer = buf}
     )
   end

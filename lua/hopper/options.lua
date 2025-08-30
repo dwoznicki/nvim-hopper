@@ -25,6 +25,7 @@ local M = {}
 
 ---@class hopper.ActionOverrides
 ---@field hopper_open_keymapper string[] | nil
+---@field hopper_open_picker string[] | nil
 ---@field hopper_open_projects_menu string[] | nil
 ---@field hopper_close string[] | nil
 ---@field keymapper_confirm string[] | nil

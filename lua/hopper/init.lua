@@ -15,7 +15,7 @@ M.toggle_info = actions.toggle_info
 M.save_project = actions.save_project
 M.delete_project = actions.delete_project
 M.list_file_keymaps = actions.list_file_keymaps
-M.file_keymaps_picker = actions.file_keymaps_picker
+M.open_file_keymaps_picker = require("hopper.view.picker").open_file_keymaps_picker
 M.save_file_keymap = actions.save_file_keymap
 M.delete_file_keymap = actions.delete_file_keymap
 
