@@ -19,6 +19,7 @@ function M.open_file_keymaps_picker(opts)
           text = string.format("%s %s %s", file.project, file.path, file.keymap),
           file = file.path,
           path = file.path,
+          keymap = file.keymap,
           project = file.project,
         })
       end
@@ -35,11 +36,19 @@ function M.open_file_keymaps_picker(opts)
         -- Reset picker.
         picker:find()
       end,
+      edit_keymap = function(picker, item)
+        if not item then
+          return
+        end
+        require("hopper.view.keymapper").form():open(item.path)
+        picker:close()
+      end,
     },
     win = {
       input = {
         keys = {
           ["dd"] = {"delete_file_keymap", mode = "n", desc = "Delete file keymap"},
+          ["K"] = {"edit_keymap", mode = "n", desc = "Edit keymap"},
         },
       },
     },
