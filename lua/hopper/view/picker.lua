@@ -1,3 +1,5 @@
+local keymapper_view = require("hopper.view.keymapper")
+
 local M = {}
 
 ---@class hopper.FileKeymapsPickerOptions
@@ -40,7 +42,7 @@ function M.open_file_keymaps_picker(opts)
         if not item then
           return
         end
-        require("hopper.view.keymapper").form():open(item.path)
+        keymapper_view.Keymapper:open(item.path)
         picker:close()
       end,
     },

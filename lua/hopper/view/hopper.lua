@@ -2,6 +2,8 @@ local utils = require("hopper.utils")
 local keymaps = require("hopper.keymaps")
 local projects = require("hopper.projects")
 local options = require("hopper.options")
+local keymapper_view = require("hopper.view.keymapper")
+local project_menu_view = require("hopper.view.project_menu")
 
 local M = {}
 
@@ -367,7 +369,7 @@ function Hopper:_attach_event_handlers()
   local function open_keymapper()
     local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
     local reopen_hopper = self:_new_reopen_callback()
-    require("hopper.view.keymapper").form():open(
+    keymapper_view.Keymapper.instance():open(
       path,
       {
         project = self.project,
@@ -403,7 +405,7 @@ function Hopper:_attach_event_handlers()
   -- Open project menu view.
   local function open_project_menu()
     local reopen_hopper = self:_new_reopen_callback({project_source = "current"})
-    require("hopper.view.project_ui").open_project_menu({
+    project_menu_view.open_project_menu({
       on_new_project_created = reopen_hopper,
       on_current_project_changed = reopen_hopper,
       on_project_deleted = reopen_hopper,
@@ -428,14 +430,14 @@ function Hopper:_attach_event_handlers()
   })
 end
 
-local _float = nil ---@type hopper.Hopper | nil
+Hopper._instance = nil ---@type hopper.Hopper | nil
 
 ---@return hopper.Hopper
-function M.float()
-  if _float == nil then
-    _float = Hopper._new()
+function Hopper.instance()
+  if Hopper._instance == nil then
+    Hopper._instance = Hopper._new()
   end
-  return _float
+  return Hopper._instance
 end
 
 return M

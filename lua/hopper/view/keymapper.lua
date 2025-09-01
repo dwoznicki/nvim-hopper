@@ -452,14 +452,14 @@ function Keymapper:_can_confirm()
   return true
 end
 
-local _form = nil ---@type hopper.Keymapper | nil
+Keymapper._instance = nil ---@type hopper.Keymapper | nil
 
 ---@return hopper.Keymapper
-function M.form()
-  if _form == nil then
-    _form = Keymapper._new()
+function Keymapper.instance()
+  if Keymapper._instance == nil then
+    Keymapper._instance = Keymapper._new()
   end
-  return _form
+  return Keymapper._instance
 end
 
 return M

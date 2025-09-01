@@ -409,14 +409,14 @@ function NewProjectForm:_form_ok()
   return string.len(self.name) > 0 and string.len(self.path) > 0
 end
 
-local _form = nil ---@type hopper.NewProjectForm | nil
+NewProjectForm._instance = nil ---@type hopper.NewProjectForm | nil
 
 ---@return hopper.NewProjectForm
-function M.form()
-  if _form == nil then
-    _form = NewProjectForm._new()
+function NewProjectForm.instance()
+  if NewProjectForm._instance == nil then
+    NewProjectForm._instance = NewProjectForm._new()
   end
-  return _form
+  return NewProjectForm._instance
 end
 
 ---@class hopper.ListAvailableProjectItemsOptions
@@ -542,7 +542,7 @@ function M.open_project_menu(opts)
     },
     function(_, idx)
       if idx == 1 then
-        M.form():open({
+        NewProjectForm.instance():open({
           on_created = opts.on_new_project_created,
         })
       elseif idx == 2 then

@@ -196,14 +196,14 @@ function InfoOverlay:_attach_event_handlers()
   })
 end
 
-local _overlay = nil ---@type hopper.InfoOverlay | nil
+InfoOverlay._instance = nil ---@type hopper.InfoOverlay | nil
 
 ---@return hopper.InfoOverlay
-function M.overlay()
-  if _overlay == nil then
-    _overlay = InfoOverlay._new()
+function InfoOverlay.instance()
+  if InfoOverlay._instance == nil then
+    InfoOverlay._instance = InfoOverlay._new()
   end
-  return _overlay
+  return InfoOverlay._instance
 end
 
 return M

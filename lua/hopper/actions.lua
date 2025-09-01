@@ -1,10 +1,13 @@
 local utils = require("hopper.utils")
 local projects = require("hopper.projects")
+local keymapper_view = require("hopper.view.keymapper")
+local info_view = require("hopper.view.info")
+local hopper_view = require("hopper.view.hopper")
 
 local M = {}
 
 function M.toggle_hopper()
-  local float = require("hopper.view.hopper").float()
+  local float = hopper_view.Hopper.instance()
   if float.is_open then
     float:close()
   else
@@ -16,16 +19,16 @@ function M.toggle_keymapper()
   local project = projects.current_project()
   local file_path = vim.api.nvim_buf_get_name(0)
   local path = projects.path_from_project_root(project.path, file_path)
-  local float = require("hopper.view.keymapper").form()
-  if float.is_open then
-    float:close()
+  local keymapper = keymapper_view.Keymapper.instance()
+  if keymapper.is_open then
+    keymapper:close()
   else
-    float:open(path)
+    keymapper:open(path)
   end
 end
 
 function M.toggle_info()
-  local overlay = require("hopper.view.info").overlay()
+  local overlay = info_view.InfoOverlay.instance()
   if overlay.is_open then
     overlay:close()
   else
