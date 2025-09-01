@@ -368,6 +368,11 @@ function Hopper:_attach_event_handlers()
   -- Open new keymapper view.
   local function open_keymapper()
     local path = projects.path_from_project_root(self.project.path, vim.api.nvim_buf_get_name(self.prior_buf))
+    if path == "." then
+      -- The project root is currently open. Making a mapping for it is probably a mistake.
+      vim.notify("Cannot assign a keymap to project root directory.", vim.log.levels.WARN)
+      return
+    end
     local reopen_hopper = self:_new_reopen_callback()
     keymapper_view.Keymapper.instance():open(
       path,

@@ -171,7 +171,7 @@ function M.keymap_for_path(path, num_path_tokens_to_check, keymap_length, allowe
   end
   -- We've failed to find a good key combination using file path characters. Time to see if there
   -- are any free combinations whatsoever that could work.
-  local available_keymaps = M.list_available_keymaps(assigned_keymaps, allowed_keys, keymap_length)
+  local available_keymaps = M.list_available_keymaps(assigned_keymaps, vim.tbl_keys(allowed_keys), keymap_length)
   if #available_keymaps > 0 then
     return available_keymaps[1]
   end
@@ -179,12 +179,11 @@ function M.keymap_for_path(path, num_path_tokens_to_check, keymap_length, allowe
 end
 
 ---@param existing_keymaps table<string, true>
----@param allowed_keys table<string, true>
+---@param allowed_keys string[]
 ---@param keymap_length integer
 ---@return string[] available_keymaps
 function M.list_available_keymaps(existing_keymaps, allowed_keys, keymap_length)
   local num_allowed_keys = #allowed_keys
-  -- local total_keymap_permutions = num_allowed_keys ^ keymap_length
   local num_tried = 0
   local available_keymaps = {} ---@type string[]
   local this_keymap_indexes = {} ---@type integer[]
@@ -202,9 +201,6 @@ function M.list_available_keymaps(existing_keymaps, allowed_keys, keymap_length)
       table.insert(available_keymaps, keymap)
     end
     num_tried = num_tried + 1
-    -- if num_tried % 50 == 0 or num_tried >= total_keymap_permutions then
-    --   schedule_draw_progress(num_tried, #available_keymaps, total_keymap_permutions)
-    -- end
     while true do
       this_keymap_indexes[incr_index] = this_keymap_indexes[incr_index] + 1
       if this_keymap_indexes[incr_index] > num_allowed_keys then
