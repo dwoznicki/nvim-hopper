@@ -121,6 +121,7 @@ end
 ---@param file_path string
 ---@return string path_from_project_root
 function M.path_from_project_root(project_path, file_path)
+  local input_file_path = file_path 
   -- Resolve symlinks.
   project_path = loop.fs_realpath(project_path) or project_path
   file_path = loop.fs_realpath(file_path) or file_path
@@ -136,6 +137,12 @@ function M.path_from_project_root(project_path, file_path)
     -- Ensure root ends with a slash for prefix match.
   if not project_path:match("/$") then
     project_path = project_path .. "/"
+  end
+
+  -- File path is relative and points to a file that already exists within the project. This input
+  -- path is fine as is.
+  if loop.fs_stat(project_path .. input_file_path) ~= nil then
+    return input_file_path
   end
 
     -- File is inside root.

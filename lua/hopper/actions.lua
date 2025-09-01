@@ -87,13 +87,14 @@ end
 ---@class hopper.SaveFileKeymapOptions
 ---@field project hopper.Project | string | nil
 
----@param path string
 ---@param keymap string
+---@param path string
 ---@param opts? hopper.SaveFileKeymapOptions
 ---@return hopper.FileKeymap
 function M.save_file_keymap(keymap, path, opts)
   opts = opts or {}
   local project = projects.ensure_project(opts.project)
+  path = projects.path_from_project_root(project.path, path)
   local datastore = require("hopper.db").datastore()
   datastore:set_file_keymap(project.name, path, keymap)
   local file = datastore:get_file_keymap_by_path(project.name, path)

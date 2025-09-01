@@ -255,7 +255,7 @@ describe("keymaps", function()
         )
       )
     end)
-    it("should just pick something at random when no valid keymaps found #only", function()
+    it("should just pick something at random when no valid keymaps found", function()
       assert.is_not_nil(
         keymaps.keymap_for_path(
           "/wo",
