@@ -178,6 +178,53 @@ function M.keymap_for_path(path, num_path_tokens_to_check, keymap_length, allowe
   error("Unable to find keymap for path. All keymap combinations appear to be in use.")
 end
 
+---@param existing_keymaps table<string, true>
+---@param allowed_keys table<string, true>
+---@param keymap_length integer
+---@return string[] available_keymaps
+function M.list_available_keymaps(existing_keymaps, allowed_keys, keymap_length)
+  local num_allowed_keys = #allowed_keys
+  -- local total_keymap_permutions = num_allowed_keys ^ keymap_length
+  local num_tried = 0
+  local available_keymaps = {} ---@type string[]
+  local this_keymap_indexes = {} ---@type integer[]
+  for _ = 1, keymap_length do
+    table.insert(this_keymap_indexes, 1)
+  end
+  local incr_index = #this_keymap_indexes
+
+  while true do
+    local keymap = ""
+    for _, idx in ipairs(this_keymap_indexes) do
+      keymap = keymap .. allowed_keys[idx]
+    end
+    if not existing_keymaps[keymap] then
+      table.insert(available_keymaps, keymap)
+    end
+    num_tried = num_tried + 1
+    -- if num_tried % 50 == 0 or num_tried >= total_keymap_permutions then
+    --   schedule_draw_progress(num_tried, #available_keymaps, total_keymap_permutions)
+    -- end
+    while true do
+      this_keymap_indexes[incr_index] = this_keymap_indexes[incr_index] + 1
+      if this_keymap_indexes[incr_index] > num_allowed_keys then
+        this_keymap_indexes[incr_index] = 1
+        incr_index = incr_index - 1
+        if incr_index < 1 then
+          break
+        end
+      else
+        incr_index = #this_keymap_indexes
+        break
+      end
+    end
+    if incr_index < 1 then
+      break
+    end
+  end
+  return available_keymaps
+end
+
 ---@param path string
 ---@param available_width integer
 ---@return string truncated_path
