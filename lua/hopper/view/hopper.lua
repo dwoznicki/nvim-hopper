@@ -39,13 +39,12 @@ Hopper.default_action_open_picker = {"j"}
 Hopper.default_action_open_project_menu = {"p"}
 Hopper.default_action_close = {"<esc>"}
 
-
 ---@return hopper.Hopper
 function Hopper._new()
-  local float = {}
-  setmetatable(float, Hopper)
-  Hopper._reset(float)
-  return float
+  local instance = {}
+  setmetatable(instance, Hopper)
+  Hopper._reset(instance)
+  return instance
 end
 
 ---@param float hopper.Hopper
@@ -281,6 +280,7 @@ function Hopper:_set_files(files)
       node = node[key]
     end
   end
+  utils.sort_file_keymaps(files)
   self.files = files
   self.filtered_files = files
   self.keymap_file_tree = tree
@@ -337,7 +337,7 @@ function Hopper:_attach_event_handlers()
           utils.open_or_focus_file(path, {open_cmd = open_cmd})
         end)
       else
-        -- The selected object is another set of poossible next characters in the keymap.
+        -- The selected object is another set of possible next characters in the keymap.
         -- Filter the visible list down to only files that are possible to select from this keymap
         -- so far.
         local filtered_files = {} ---@type hopper.FileKeymap[]
@@ -352,6 +352,7 @@ function Hopper:_attach_event_handlers()
             end
           end
         end
+        utils.sort_file_keymaps(filtered_files)
         self.filtered_files = filtered_files
         self:draw()
       end

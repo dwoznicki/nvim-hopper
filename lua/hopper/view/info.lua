@@ -1,6 +1,8 @@
 local utils = require("hopper.utils")
 local projects = require("hopper.projects")
 
+local loop = vim.uv or vim.loop
+
 local M = {}
 
 ---@class hopper.InfoOverlay
@@ -115,7 +117,6 @@ function InfoOverlay:init()
   end
   local schedule_draw_progress = vim.schedule_wrap(draw_progress)
 
-  local loop = vim.uv or vim.loop
   loop.new_timer():start(0, 0, function()
     local datastore = require("hopper.db").datastore()
     local existing_keymaps = utils.set(datastore:list_keymaps(self.project.name))

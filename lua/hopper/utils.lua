@@ -20,11 +20,6 @@ function M.get_win_dimensions(width, height)
     win_height = height
   end
   return win_width, win_height
-  -- local width = math.ceil(ui.width * 0.5)
-  -- -- For height, we'll try and choose a reasonable value without going over the available
-  -- -- remaining space.
-  -- local height = math.max(math.ceil(ui.height * 0.6), 16)
-  -- return width, height
 end
 
 ---@param list string[]
@@ -238,5 +233,14 @@ function M.parse_user_command_args(fargs)
   return subcommand, kv_args
 end
 
+---@param file_keymaps hopper.FileKeymap
+function M.sort_file_keymaps(file_keymaps)
+  table.sort(
+    file_keymaps,
+    function(a, b)
+      return a.path < b.path
+    end
+  )
+end
 
 return M
