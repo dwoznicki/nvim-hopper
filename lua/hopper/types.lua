@@ -31,14 +31,11 @@
 ---@field third_key string | nil
 ---@field fourth_key string | nil
 
+---@alias hopper.HopperViewAction "open_keymapper" | "open_project_menu" | "open_picker" | "close"
+---@alias hopper.KeymapperViewAction "confirm" | "accept_suggestion" | "go_back" | "close"
+---@alias hopper.NewProjectViewAction "confirm" | "accept_suggestion" | "close"
+
 ---@class hopper.ActionOptions
----@field hopper_open_keymapper string | string[] | nil
----@field hopper_open_projects_menu string | string[] | nil
----@field hopper_close string | string[] | nil
----@field keymapper_confirm string | string[] | nil
----@field keymapper_accept_suggestion string | string[] | nil
----@field keymapper_go_back string | string[] | nil
----@field keymapper_close string | string[] | nil
----@field new_project_confirm string | string[] | nil
----@field new_project_accept_suggestion string | string[] | nil
----@field new_project_close string | string[] | nil
+---@field hopper table<hopper.HopperViewAction, string | string[] | nil> | nil
+---@field keymapper table<hopper.HopperViewAction, string | string[] | nil> | nil
+---@field new_project table<hopper.HopperViewAction, string | string[] | nil> | nil

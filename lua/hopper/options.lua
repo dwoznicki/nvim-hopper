@@ -8,7 +8,7 @@ local M = {}
 ---@field db hopper.ResolvedDatabaseOptions
 ---@field float hopper.ResolvedFloatOptions
 ---@field colors hopper.ColorPalette
----@field actions hopper.ActionOverrides
+---@field actions hopper.ResolvedActions
 
 ---@class hopper.ResolvedKeymappingOptions
 ---@field keyset string[]
@@ -23,18 +23,10 @@ local M = {}
 ---@field width integer | decimal
 ---@field height integer | decimal
 
----@class hopper.ActionOverrides
----@field hopper_open_keymapper string[] | nil
----@field hopper_open_picker string[] | nil
----@field hopper_open_projects_menu string[] | nil
----@field hopper_close string[] | nil
----@field keymapper_confirm string[] | nil
----@field keymapper_accept_suggestion string[] | nil
----@field keymapper_go_back string[] | nil
----@field keymapper_close string[] | nil
----@field new_project_confirm string[] | nil
----@field new_project_accept_suggestion string[] | nil
----@field new_project_close string[] | nil
+---@class hopper.ResolvedActions
+---@field hopper table<hopper.HopperViewAction, string[]>
+---@field keymapper table<hopper.KeymapperViewAction, string[]>
+---@field new_project table<hopper.NewProjectViewAction, string[]>
 
 local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
@@ -51,7 +43,25 @@ local _default_options = { ---@type hopper.ResolvedOptions
     height = 0.6,
   },
   colors = {}, -- Derived after colorscheme loads.
-  actions = {}, -- No overrides by default.
+  actions = {
+    hopper = {
+      open_keymapper = {"k"},
+      open_picker = {"j"},
+      open_project_menu = {"p"},
+      close = {"q"},
+    },
+    keymapper = {
+      confirm = {"<cr>"},
+      accept_suggestion = {"<tab>"},
+      go_back = {"<bs>"},
+      close = {"q"},
+    },
+    new_project = {
+      confirm = {"<cr>"},
+      accept_suggestion = {"<tab>"},
+      close = {"q"},
+    },
+  },
 }
 
 local _options = nil ---@type hopper.ResolvedOptions | nil
@@ -81,7 +91,10 @@ local function normalize_and_validate_options(opts)
       keyset = deduped_keyset
       -- Ensure there is at least one key in the set.
       if #keyset < 1 then
-        error(string.format("`options.keymapping.keyset` must contain at least one key. Instead got: %s", opts.keymapping.keyset))
+        vim.notify(
+          string.format("`options.keymapping.keyset` must contain at least one key. Instead got: %s", opts.keymapping.keyset),
+          vim.log.levels.WARN
+        )
       end
       -- Ensure all keys in the set look valid.
       local invalid_keys = {} ---@type string[]
@@ -92,7 +105,10 @@ local function normalize_and_validate_options(opts)
         end
       end
       if #invalid_keys > 0 then
-        error(string.format("`options.keymapping.keyset` contains %s invalid keys. Keys must be exactly one character long. Invalid keys: %s", #invalid_keys, invalid_keys))
+        vim.notify(
+          string.format("`options.keymapping.keyset` contains %s invalid keys. Keys must be exactly one character long. Invalid keys: %s", #invalid_keys, invalid_keys),
+          vim.log.levels.WARN
+        )
       end
       opts.keymapping.keyset = keyset
     end
@@ -100,29 +116,34 @@ local function normalize_and_validate_options(opts)
     if opts.keymapping.length ~= nil then
       local keymapping_length = opts.keymapping.length
       if not utils.is_integer(keymapping_length) or keymapping_length < 1 or keymapping_length > 3 then
-        error(string.format("`options.keymapping.length` must be a valid integer between 1 and 4. Instead got: %s", keymapping_length))
+        vim.notify(
+          string.format("`options.keymapping.length` must be a valid integer between 1 and 4. Instead got: %s", keymapping_length),
+          vim.log.levels.WARN
+        )
       end
     end
   end
   if opts.actions ~= nil then
-    local actions = opts.actions ---@type table<string, string | string[] | nil>
-    local action_overrides = {} ---@type hopper.ActionOverrides
-    for action, keys in pairs(actions) do
-      if type(keys) == "string" then
-        action_overrides[action] = {keys}
-      else
-        action_overrides[action] = keys
+    for ns, _ in pairs(opts.actions) do
+      for action, keys in pairs(ns) do
+        if type(keys) == "string" then
+          opts.actions[action] = {keys}
+        else
+          opts.actions[action] = keys
+        end
       end
     end
-    -- lua_ls doesn't appear to be smart enough to understand that hopper.ActionOverrides is a valid
-    -- subset of hopper.ActionOptions.
-    ---@diagnostic disable-next-line assign-type-mismatch
-    opts.actions = action_overrides
   end
 end
 
 ---@param opts hopper.Options | nil
 function M.set_options(opts)
+  if opts == nil then
+    opts = {}
+  else
+    -- Clone so that we can mutate safely while normalizing.
+    opts = vim.deepcopy(opts)
+  end
   opts = opts or {}
   normalize_and_validate_options(opts)
   _options = vim.tbl_deep_extend("force", {}, _default_options, opts) ---@type hopper.ResolvedOptions

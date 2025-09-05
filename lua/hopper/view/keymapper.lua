@@ -29,6 +29,7 @@ local M = {}
 ---@field validation hopper.KeymapperValidation | nil
 ---@field suggested_keymap string | nil
 ---@field keymap_length integer | nil
+---@field actions table<hopper.KeymapperViewAction, string[]>
 ---@field on_keymap_set fun(form: hopper.Keymapper) | nil
 ---@field on_back fun(form: hopper.Keymapper) | nil
 local Keymapper = {}
@@ -48,23 +49,24 @@ function Keymapper._new()
   return form
 end
 
----@param form hopper.Keymapper
-function Keymapper._reset(form)
-  form.project = nil
-  form.path = ""
-  form.keymap = ""
-  form.existing_file = nil
-  form.is_open = false
-  form.buf = -1
-  form.win = -1
-  form.win_width = -1
-  form.footer_buf = -1
-  form.footer_win = -1
-  form.validation = nil
-  form.suggested_keymap = nil
-  form.keymap_length = -1
-  form.on_keymap_set = nil
-  form.on_back = nil
+---@param instance hopper.Keymapper
+function Keymapper._reset(instance)
+  instance.project = nil
+  instance.path = ""
+  instance.keymap = ""
+  instance.existing_file = nil
+  instance.is_open = false
+  instance.buf = -1
+  instance.win = -1
+  instance.win_width = -1
+  instance.footer_buf = -1
+  instance.footer_win = -1
+  instance.validation = nil
+  instance.suggested_keymap = nil
+  instance.keymap_length = -1
+  instance.actions = {}
+  instance.on_keymap_set = nil
+  instance.on_back = nil
 end
 
 ---@class hopper.KeymapperOpenOptions
@@ -81,6 +83,8 @@ function Keymapper:open(path, opts)
   local full_options = options.options()
   self.project = projects.ensure_project(opts.project)
   self.keymap_length = opts.keymap_length or full_options.keymapping.length
+  self.actions = full_options.actions.keymapper
+
   self.on_keymap_set = opts.on_keymap_set
   self.on_back = opts.on_back
 
@@ -164,11 +168,8 @@ function Keymapper:open(path, opts)
 
   self:draw()
 
-  loop.new_timer():start(300, 0, function()
-    -- Delay so it "pops in", mimicing expected suggestion UX.
-    vim.schedule(function()
-      self:_suggest_keymap()
-    end)
+  vim.schedule(function()
+    self:_suggest_keymap()
   end)
 end
 
@@ -386,47 +387,57 @@ function Keymapper:_attach_event_handlers()
     end,
   })
 
-  -- Confirm new project on enter keypress.
-  vim.keymap.set(
-    {"i", "n"},
-    "<cr>",
-    function()
-      if self:_can_confirm() then
-        self:confirm()
-        return ""
-      end
-      -- Fallback to default return behavior.
-      return vim.api.nvim_replace_termcodes("<cr>", true, false, true)
-    end,
-    {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
-  )
-
-  -- Accept suggestion on tab keypress.
-  vim.keymap.set(
-    {"i", "n"},
-    "<tab>",
-    function()
-      if self.suggested_keymap ~= nil then
-        vim.schedule(function()
-          self:accept_suggestion()
-        end)
-        return ""
-      end
-      -- Fallback to default tab behavior.
-      return vim.api.nvim_replace_termcodes("<tab>", true, false, true)
-    end,
-    {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
-  )
-  if self.on_back ~= nil then
-    -- Go back to previous view on backspace keypress.
+  -- Confirm new keymap.
+  local confirm_keymaps = self.actions.confirm
+  for _, keymap in ipairs(confirm_keymaps) do
     vim.keymap.set(
-      "n",
-      "<bs>",
+      {"i", "n"},
+      keymap,
       function()
-        self.on_back(self)
+        if self:_can_confirm() then
+          self:confirm()
+          return ""
+        end
+        -- Fallback to default return behavior.
+        return vim.api.nvim_replace_termcodes("<cr>", true, false, true)
       end,
-      {noremap = true, silent = true, nowait = true, buffer = buf}
+      {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
     )
+  end
+
+  -- Accept suggestion keymap.
+  local accept_suggestion_keymaps = self.actions.accept_suggestion
+  for _, keymap in ipairs(accept_suggestion_keymaps) do
+    vim.keymap.set(
+      {"i", "n"},
+      keymap,
+      function()
+        if self.suggested_keymap ~= nil then
+          vim.schedule(function()
+            self:accept_suggestion()
+          end)
+          return ""
+        end
+        -- Fallback to default tab behavior.
+        return vim.api.nvim_replace_termcodes("<tab>", true, false, true)
+      end,
+      {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
+    )
+  end
+
+  if self.on_back ~= nil then
+    -- Go back to previous view.
+    local go_back_keymaps = self.actions.go_back
+    for _, keymap in ipairs(go_back_keymaps) do
+      vim.keymap.set(
+        "n",
+        keymap,
+        function()
+          self.on_back(self)
+        end,
+        {noremap = true, silent = true, nowait = true, buffer = buf}
+      )
+    end
   end
 
   utils.attach_close_events({
@@ -434,7 +445,7 @@ function Keymapper:_attach_event_handlers()
     on_close = function()
       self:close()
     end,
-    keypress_events = {"<esc>", "q"},
+    keypress_events = self.actions.close,
     vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end

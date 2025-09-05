@@ -24,20 +24,13 @@ local M = {}
 ---@field prior_buf integer
 ---@field keymap_length integer
 ---@field open_cmd string | nil
----@field action_open_keymapper string[]
----@field action_open_picker string[]
----@field action_open_project_menu string[]
----@field action_close string[]
+---@field actions table<hopper.HopperViewAction, string[]>
 local Hopper = {}
 Hopper.__index = Hopper
 M.Hopper = Hopper
 
 Hopper.ns = vim.api.nvim_create_namespace("hopper.Hopper")
 Hopper.footer_ns = vim.api.nvim_create_namespace("hopper.HopperFooter")
-Hopper.default_action_open_keymapper = {"k"}
-Hopper.default_action_open_picker = {"j"}
-Hopper.default_action_open_project_menu = {"p"}
-Hopper.default_action_close = {"<esc>"}
 
 ---@return hopper.Hopper
 function Hopper._new()
@@ -47,25 +40,22 @@ function Hopper._new()
   return instance
 end
 
----@param float hopper.Hopper
-function Hopper._reset(float)
-  float.project = nil
-  float.files = {}
-  float.is_open = false
-  float.keymap_file_tree = {}
-  float.filtered_files = {}
-  float.buf = -1
-  float.win = -1
-  float.win_width = -1
-  float.footer_buf = -1
-  float.footer_win = -1
-  float.prior_buf = -1
-  float.keymap_length = -1
-  float.open_cmd = nil
-  float.action_open_keymapper = Hopper.default_action_open_keymapper
-  float.action_open_picker = Hopper.default_action_open_picker
-  float.action_open_project_menu = Hopper.default_action_open_project_menu
-  float.action_close = Hopper.default_action_close
+---@param instance hopper.Hopper
+function Hopper._reset(instance)
+  instance.project = nil
+  instance.files = {}
+  instance.is_open = false
+  instance.keymap_file_tree = {}
+  instance.filtered_files = {}
+  instance.buf = -1
+  instance.win = -1
+  instance.win_width = -1
+  instance.footer_buf = -1
+  instance.footer_win = -1
+  instance.prior_buf = -1
+  instance.keymap_length = -1
+  instance.open_cmd = nil
+  instance.actions = {}
 end
 
 ---@class hopper.OpenHopperOptions
@@ -88,13 +78,7 @@ function Hopper:open(opts)
   if self.open_cmd ~= nil and string.len(self.open_cmd) < 1 then
     vim.notify_once(string.format('Open command "%s" is invalid.', self.open_cmd), vim.log.levels.WARN)
   end
-
-  -- Action keymaps
-  local action_overrides = full_options.actions
-  self.action_open_keymapper = action_overrides.hopper_open_keymapper or Hopper.default_action_open_keymapper
-  self.action_open_picker = action_overrides.hopper_open_picker or Hopper.default_action_open_picker
-  self.action_open_project_menu = action_overrides.hopper_open_projects_menu or Hopper.default_action_open_project_menu
-  self.action_close = action_overrides.hopper_close or Hopper.default_action_close
+  self.actions = full_options.actions.hopper
 
   local ui = vim.api.nvim_list_uis()[1]
   local opts_width = opts.width or full_options.float.width
@@ -384,7 +368,8 @@ function Hopper:_attach_event_handlers()
       }
     )
   end
-  for _, keymap in ipairs(self.action_open_keymapper) do
+  local open_keymapper_keymaps = self.actions.open_keymapper
+  for _, keymap in ipairs(open_keymapper_keymaps) do
     vim.keymap.set(
       "n",
       keymap,
@@ -399,7 +384,8 @@ function Hopper:_attach_event_handlers()
       project_filter = self.project.name,
     })
   end
-  for _, keymap in ipairs(self.action_open_picker) do
+  local open_picker_keymaps = self.actions.open_picker
+  for _, keymap in ipairs(open_picker_keymaps) do
     vim.keymap.set(
       "n",
       keymap,
@@ -417,7 +403,8 @@ function Hopper:_attach_event_handlers()
       on_project_deleted = reopen_hopper,
     })
   end
-  for _, keymap in ipairs(self.action_open_project_menu) do
+  local open_project_menu_keymaps = self.actions.open_project_menu
+  for _, keymap in ipairs(open_project_menu_keymaps) do
     vim.keymap.set(
       "n",
       keymap,
@@ -431,7 +418,7 @@ function Hopper:_attach_event_handlers()
     on_close = function()
       self:close()
     end,
-    keypress_events = self.action_close,
+    keypress_events = self.actions.close,
     vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end

@@ -22,6 +22,7 @@ local M = {}
 ---@field validation hopper.NewProjectFormValidation | nil
 ---@field suggested_project hopper.Project | nil
 ---@field is_open boolean
+---@field actions table<hopper.NewProjectViewAction, string[]>
 ---@field on_created fun(form: hopper.NewProjectForm) | nil
 ---@field on_cancel fun(form: hopper.NewProjectForm) | nil
 local NewProjectForm = {}
@@ -41,19 +42,20 @@ function NewProjectForm._new()
   return form
 end
 
----@param form hopper.NewProjectForm
-function NewProjectForm._reset(form)
-  form.name = ""
-  form.path = ""
-  form.buf = -1
-  form.win = -1
-  form.footer_buf = -1
-  form.footer_win = -1
-  form.validation = nil
-  form.suggested_project = nil
-  form.is_open = false
-  form.on_created = nil
-  form.on_cancel = nil
+---@param instance hopper.NewProjectForm
+function NewProjectForm._reset(instance)
+  instance.name = ""
+  instance.path = ""
+  instance.buf = -1
+  instance.win = -1
+  instance.footer_buf = -1
+  instance.footer_win = -1
+  instance.validation = nil
+  instance.suggested_project = nil
+  instance.is_open = false
+  instance.actions = {}
+  instance.on_created = nil
+  instance.on_cancel = nil
 end
 
 ---@class hopper.NewProjectFormOpenOptions
@@ -65,6 +67,7 @@ end
 function NewProjectForm:open(opts)
   opts = opts or {}
   local full_options = options.options()
+  self.actions = full_options.actions.new_project
   self.on_created = opts.on_created
   self.on_cancel = opts.on_cancel
 
@@ -133,8 +136,7 @@ function NewProjectForm:open(opts)
 
   self:draw_footer()
 
-  loop.new_timer():start(300, 0, function()
-    -- Delay so it "pops in", mimicing expected suggestion UX.
+  vim.schedule(function()
     self:_suggest_project()
   end)
 end
@@ -320,38 +322,44 @@ function NewProjectForm:_attach_event_handlers()
     end,
   })
 
-  -- Confirm new project on enter keypress.
-  vim.keymap.set(
-    {"i", "n"},
-    "<cr>",
-    function()
-      local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
-      if has_values then
-        self:confirm()
-        return ""
-      end
-      -- Fallback to default return behavior.
-      return vim.api.nvim_replace_termcodes("<cr>", true, false, true)
-    end,
-    {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
-  )
+  -- Confirm new project.
+  local confirm_keymaps = self.actions.confirm
+  for _, keymap in ipairs(confirm_keymaps) do
+    vim.keymap.set(
+      {"i", "n"},
+      keymap,
+      function()
+        local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
+        if has_values then
+          self:confirm()
+          return ""
+        end
+        -- Fallback to default return behavior.
+        return vim.api.nvim_replace_termcodes("<cr>", true, false, true)
+      end,
+      {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
+    )
+  end
 
-  -- Accept suggestion on tab keypress.
-  vim.keymap.set(
-    {"i", "n"},
-    "<tab>",
-    function()
-      if self.suggested_project ~= nil then
-        vim.schedule(function()
-          self:accept_suggestion()
-        end)
-        return ""
-      end
-      -- Fallback to default tab behavior.
-      return vim.api.nvim_replace_termcodes("<tab>", true, false, true)
-    end,
-    {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
-  )
+  -- Accept suggestion.
+  local accept_suggestion_keymaps = self.actions.accept_suggestion
+  for _, keymap in ipairs(accept_suggestion_keymaps) do
+    vim.keymap.set(
+      {"i", "n"},
+      keymap,
+      function()
+        if self.suggested_project ~= nil then
+          vim.schedule(function()
+            self:accept_suggestion()
+          end)
+          return ""
+        end
+        -- Fallback to default tab behavior.
+        return vim.api.nvim_replace_termcodes("<tab>", true, false, true)
+      end,
+      {noremap = true, silent = true, nowait = true, expr = true, buffer = buf}
+    )
+  end
 
   utils.attach_close_events({
     buffer = buf,
@@ -362,7 +370,7 @@ function NewProjectForm:_attach_event_handlers()
         self:close()
       end
     end,
-    keypress_events = {"q", "<esc>"},
+    keypress_events = self.actions.close,
     vim_change_events = {"WinLeave", "BufWipeout"},
   })
 end
