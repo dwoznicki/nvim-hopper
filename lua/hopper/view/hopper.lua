@@ -4,6 +4,7 @@ local projects = require("hopper.projects")
 local options = require("hopper.options")
 local keymapper_view = require("hopper.view.keymapper")
 local project_menu_view = require("hopper.view.project_menu")
+local footer_view = require("hopper.view.footer")
 
 local M = {}
 
@@ -182,24 +183,25 @@ end
 
 function Hopper:draw_footer()
   vim.api.nvim_buf_clear_namespace(self.footer_buf, self.footer_ns, 0, -1)
-  local help_line = {{" "}} ---@type string[][]
+
   local curr_mode = vim.api.nvim_get_mode().mode
-  if curr_mode == "n" then
-    table.insert(help_line, {"k", "hopper.ActionText"})
-    table.insert(help_line, {" Keymap"})
-    table.insert(help_line, {"  "})
-    table.insert(help_line, {"j", "hopper.ActionText"})
-    table.insert(help_line, {" Picker"})
-    table.insert(help_line, {"  "})
-    table.insert(help_line, {"p", "hopper.ActionText"})
-    table.insert(help_line, {" Project"})
-  else
-    table.insert(help_line, {"k Keymap", "hopper.DisabledText"})
-    table.insert(help_line, {"  "})
-    table.insert(help_line, {"j Picker", "hopper.DisabledText"})
-    table.insert(help_line, {"  "})
-    table.insert(help_line, {"p Project", "hopper.DisabledText"})
-  end
+  local help_line = footer_view.build_help_line({
+    {
+      keymaps = self.actions.open_keymapper,
+      label = "Keymap",
+      enabled = curr_mode == "n",
+    },
+    {
+      keymaps = self.actions.open_picker,
+      label = "Picker",
+      enabled = curr_mode == "n",
+    },
+    {
+      keymaps = self.actions.open_project_menu,
+      label = "Project",
+      enabled = curr_mode == "n",
+    },
+  })
   vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {
     virt_text = help_line,
     virt_text_pos = "overlay",

@@ -1,6 +1,7 @@
 local projects = require("hopper.projects")
 local utils = require("hopper.utils")
 local options = require("hopper.options")
+local footer_view = require("hopper.view.footer")
 
 local loop = vim.uv or vim.loop
 
@@ -173,21 +174,19 @@ function NewProjectForm:draw_footer()
     table.insert(lines, error_line)
   end
 
-  local help_line = {{"  "}} ---@type string[][]
   local has_values = string.len(self.name) > 0 and string.len(self.path) > 0
-  if has_values then
-    table.insert(help_line, {"󰌑 ", "hopper.ActionText"})
-    table.insert(help_line, {" Confirm"})
-  else
-    table.insert(help_line, {"󰌑  Confirm", "hopper.DisabledText"})
-  end
-  table.insert(help_line, {"  "})
-  if self.suggested_project ~= nil then
-    table.insert(help_line, {"󰌒 ", "String"})
-    table.insert(help_line, {" Accept suggestion"})
-  else
-    table.insert(help_line, {"󰌒  Accept suggestion", "hopper.DisabledText"})
-  end
+  local help_line = footer_view.build_help_line({
+    {
+      keymaps = self.actions.confirm,
+      label = "Confirm",
+      enabled = has_values,
+    },
+    {
+      keymaps = self.actions.accept_suggestion,
+      label = "Accept suggestion",
+      enabled = self.suggested_project ~= nil,
+    },
+  })
   table.insert(lines, help_line)
 
   vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {

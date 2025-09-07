@@ -2,6 +2,7 @@ local utils = require("hopper.utils")
 local keymaps = require("hopper.keymaps")
 local projects = require("hopper.projects")
 local options = require("hopper.options")
+local footer_view = require("hopper.view.footer")
 
 local loop = vim.uv or vim.loop
 
@@ -243,30 +244,28 @@ function Keymapper:draw_footer()
     table.insert(lines, error_line)
   end
 
-  local help_line = {{"  "}} ---@type string[][]
-  if self:_can_confirm() then
-    table.insert(help_line, {"󰌑 ", "hopper.ActionText"})
-    table.insert(help_line, {" Confirm"})
-  else
-    table.insert(help_line, {"󰌑  Confirm", "hopper.DisabledText"})
-  end
-  table.insert(help_line, {"  "})
-  if self.suggested_keymap ~= nil then
-    table.insert(help_line, {"󰌒 ", "String"})
-    table.insert(help_line, {" Accept suggestion"})
-  else
-    table.insert(help_line, {"󰌒  Accept suggestion", "hopper.DisabledText"})
-  end
+  ---@type hopper.HelpItem[]
+  local help_line_items = {
+    {
+      keymaps = self.actions.confirm,
+      label = "Confirm",
+      enabled = self:_can_confirm(),
+    },
+    {
+      keymaps = self.actions.accept_suggestion,
+      label = "Accept suggestion",
+      enabled = self.suggested_keymap ~= nil,
+    },
+  }
   if self.on_back ~= nil then
-    table.insert(help_line, {"  "})
     local curr_mode = vim.api.nvim_get_mode().mode
-    if curr_mode == "n" then
-      table.insert(help_line, {"󰁮 ", "Warning"})
-      table.insert(help_line, {" Back"})
-    else
-      table.insert(help_line, {"󰁮  Back", "hopper.DisabledText"})
-    end
+    table.insert(help_line_items, {
+      keymaps = self.actions.go_back,
+      label = "Go back",
+      enabled = curr_mode == "n",
+    })
   end
+  local help_line = footer_view.build_help_line(help_line_items)
   table.insert(lines, help_line)
 
   vim.api.nvim_buf_set_extmark(self.footer_buf, self.footer_ns, 0, 0, {

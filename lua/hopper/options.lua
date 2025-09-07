@@ -24,9 +24,13 @@ local M = {}
 ---@field height integer | decimal
 
 ---@class hopper.ResolvedActions
+---@field display hopper.ResolvedActionDisplayOptions
 ---@field hopper table<hopper.HopperViewAction, string[]>
 ---@field keymapper table<hopper.KeymapperViewAction, string[]>
 ---@field new_project table<hopper.NewProjectViewAction, string[]>
+
+---@class hopper.ResolvedActionDisplayOptions
+---@field special_keys table<string, string>
 
 local _default_options = { ---@type hopper.ResolvedOptions
   keymapping = {
@@ -44,9 +48,17 @@ local _default_options = { ---@type hopper.ResolvedOptions
   },
   colors = {}, -- Derived after colorscheme loads.
   actions = {
+    display = {
+      special_keys = {
+        ["<cr>"] = "󰌑 ",
+        ["<tab>"] = "󰌒 ",
+        ["<bs>"] = "󰁮 ",
+        ["<esc>"] = "󱊷 ",
+      },
+    },
     hopper = {
-      open_keymapper = {"k"},
-      open_picker = {"j"},
+      open_keymapper = {"m"},
+      open_picker = {";"},
       open_project_menu = {"p"},
       close = {"q"},
     },

@@ -36,6 +36,10 @@
 ---@alias hopper.NewProjectViewAction "confirm" | "accept_suggestion" | "close"
 
 ---@class hopper.ActionOptions
+---@field display hopper.ActionDisplayOptions | nil
 ---@field hopper table<hopper.HopperViewAction, string | string[] | nil> | nil
 ---@field keymapper table<hopper.HopperViewAction, string | string[] | nil> | nil
 ---@field new_project table<hopper.HopperViewAction, string | string[] | nil> | nil
+
+---@class hopper.ActionDisplayOptions
+---@field special_keys table<string, string> | nil
