@@ -18,6 +18,11 @@ function M.open_file_keymaps_picker(opts)
     M.telescope_open_file_keymaps_picker(opts)
     return
   end
+  local mini_pick_available, _ = pcall(require, "mini.pick")
+  if mini_pick_available then
+    M.mini_pick_open_file_keymaps_picker(opts)
+    return
+  end
 end
 
 ---@param opts? hopper.FileKeymapsPickerOptions
@@ -135,6 +140,30 @@ function M.telescope_open_file_keymaps_picker(opts)
       return true -- Keep default mappings.
     end,
   }):find()
+end
+
+---@param opts? hopper.FileKeymapsPickerOptions
+function M.mini_pick_open_file_keymaps_picker(opts)
+  opts = opts or {}
+  local datastore = require("hopper.db").datastore()
+  local files = datastore:list_file_keymaps(opts.project_filter, opts.keymap_length_filter)
+  local items = {}
+  for _, file in ipairs(files) do
+    table.insert(items, {
+      text = string.format("%s %s %s", file.project, file.path, file.keymap),
+      file = file.path,
+      project = file.project,
+      path = file.path,
+    })
+  end
+
+  local mini_pick = require("mini.pick")
+  mini_pick.start({
+    source = {
+      items = items,
+      name = "Hopper file keymaps",
+    },
+  })
 end
 
 return M
