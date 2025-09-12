@@ -23,6 +23,11 @@ function M.open_file_keymaps_picker(opts)
     M.mini_pick_open_file_keymaps_picker(opts)
     return
   end
+  local fzf_lua_available, _ = pcall(require, "fzf-lua")
+  if fzf_lua_available then
+    M.fzf_lua_open_file_keymaps_picker(opts)
+    return
+  end
 end
 
 ---@param opts? hopper.FileKeymapsPickerOptions
@@ -158,10 +163,69 @@ function M.mini_pick_open_file_keymaps_picker(opts)
   end
 
   local mini_pick = require("mini.pick")
+  -- I cannot for the life of me figure out how to add custom actions to mini.pick. Users will have
+  -- to accept a more stripped down experience, I suppose.
   mini_pick.start({
     source = {
       items = items,
       name = "Hopper file keymaps",
+      choose = mini_pick.default_choose,
+    },
+  })
+end
+
+---@param opts? hopper.FileKeymapsPickerOptions
+function M.fzf_lua_open_file_keymaps_picker(opts)
+  opts = opts or {}
+  local fzf_lua = require("fzf-lua")
+  local datastore = require("hopper.db").datastore()
+  local files = datastore:list_file_keymaps(opts.project_filter, opts.keymap_length_filter)
+  local lines = {} ---@type string[]
+  for i, file in ipairs(files) do
+    local label = string.format("%s %s %s", file.project, file.path, file.keymap)
+    -- Prefix a hidden index we can parse back later.
+    lines[i] = string.format("%06d\t%s", i, label)
+  end
+  fzf_lua.fzf_exec(lines, {
+    fzf_opts = {
+      ["--delimiter"] = "\t",
+      ["--with-nth"] = "2..", -- hide the index, show only the label
+      ["--multi"] = true,
+    },
+    actions = {
+      ["default"] = function(selected, fzf_opts)
+        local paths = {} ---@type string[]
+        for _, line in ipairs(selected) do
+          local idx = tonumber(line:match("^(%d+)\t"))
+          local file = files[idx]
+          if file ~= nil then
+            table.insert(paths, file.path)
+          end
+        end
+        fzf_lua.actions.file_edit(paths, fzf_opts)
+      end,
+      ["alt-d"] = function(selected)
+        for _, line in ipairs(selected) do
+          local idx = tonumber(line:match("^(%d+)\t"))
+          if idx then
+            local file = files[idx]
+            if file then
+              datastore:remove_file_keymap(file.project, file.path)
+            end
+          end
+        end
+        -- Reopen picker after delete. This results in a noticeable flash, but fixing it requires
+        -- digging deepder into fzf-lua internals than I'm willing to do.
+        vim.schedule(function()
+          M.fzf_lua_open_file_keymaps_picker(opts)
+        end)
+      end,
+      ["alt-m"] = function(selected)
+        local line = selected[1]
+        local idx = tonumber(line:match("^(%d+)\t"))
+        local file = files[idx]
+        keymapper_view.Keymapper:open(file.path)
+      end,
     },
   })
 end

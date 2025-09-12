@@ -382,8 +382,12 @@ function Hopper:_attach_event_handlers()
 
   -- Open picker view.
   local function open_file_keymaps_picker()
+    local project_name = self.project.name
+    vim.schedule(function()
+      self:close()
+    end)
     require("hopper.view.picker").open_file_keymaps_picker({
-      project_filter = self.project.name,
+      project_filter = project_name
     })
   end
   local open_picker_keymaps = self.actions.open_picker
