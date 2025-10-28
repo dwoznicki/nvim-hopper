@@ -100,6 +100,27 @@ local function setup_higlights()
   vim.api.nvim_set_hl(0, "hopper.FloatFooter", {fg = "#DCD7BA", bg = "#2A2A37"})
 end
 
+---@class hopper.KeyColors
+---@field first_key string
+---@field second_key string
+---@field third_key string
+---@field fourth_key string
+
+---@return hopper.KeyColors
+function M.key_colors()
+  local color_opts = options.options().colors
+  local first_key_color = color_opts.first_key or color_fg("Exception")
+  local second_key_color = color_opts.second_key or color_fg("Special")
+  local third_key_color = color_opts.third_key or color_fg("Identifier")
+  local fourth_key_color = color_opts.fourth_key or color_fg("String")
+  return {
+    first_key = first_key_color,
+    second_key = second_key_color,
+    third_key = third_key_color,
+    fourth_key = fourth_key_color,
+  }
+end
+
 function M.setup()
   vim.api.nvim_create_autocmd("ColorScheme", {
     pattern = "*",

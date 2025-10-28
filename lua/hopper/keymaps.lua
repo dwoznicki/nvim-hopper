@@ -371,16 +371,18 @@ function M.keymap_location_in_path(path, keymap, opts)
 end
 
 ---@class hopper.HighlightPathOptions
----@field next_key_index integer
+---@field next_key_index? integer
+---@field default_highlight_name? string Defaults to "hopper.MutedText".
 
 ---@param path string
 ---@param keymap string
 ---@param keymap_indexes integer[]
 ---@param opts? hopper.HighlightPathOptions
----@return string[][]
+---@return string[][] highlight_parts The path split into `[text, highlight_name]` tuples.
 function M.highlight_path_virtual_text(path, keymap, keymap_indexes, opts)
   opts = opts or {}
   local next_key_index = opts.next_key_index or -1
+  local default_highlight_name = opts.default_highlight_name == nil and "hopper.MutedText" or opts.default_highlight_name
 
   local highlighted_parts = {} ---@type string[][]
   local start_idx = 1
@@ -418,12 +420,14 @@ function M.highlight_path_virtual_text(path, keymap, keymap_indexes, opts)
         hl_name = "hopper.FourthKey"
       end
     end
-    table.insert(highlighted_parts, {part, "hopper.MutedText"})
+    -- table.insert(highlighted_parts, {part, "hopper.MutedText"})
+    table.insert(highlighted_parts, {part, default_highlight_name})
     table.insert(highlighted_parts, {key, hl_name})
     start_idx = idx + 1
   end
   local part = string.sub(path, start_idx)
-  table.insert(highlighted_parts, {part, "hopper.MutedText"})
+  -- table.insert(highlighted_parts, {part, "hopper.MutedText"})
+  table.insert(highlighted_parts, {part, default_highlight_name})
   return highlighted_parts
 end
 
