@@ -292,8 +292,36 @@ function M.truncate_path(path, available_width)
   return join_truncated_path_tokens()
 end
 
+---@param keymap_char string
+---@param path_char string
+---@param case_matching "exact" | "ignore" | "smart"
+function is_character_match(keymap_char, path_char, case_matching)
+  if case_matching == "ignore" then
+    return string.lower(keymap_char) == string.lower(path_char)
+  end
+  if case_matching == "smart" then
+    if string.upper(keymap_char) == keymap_char then
+      return keymap_char == path_char
+    end
+    return keymap_char == string.lower(path_char)
+  end
+  -- "exact"
+  return keymap_char == path_char
+end
+
 ---@class hopper.KeymapLocationInPathOptions
----@field missing_behavior "-1" | "end" | "nearby"
+---@field missing_behavior? "-1" | "end" | "nearby" Index assignment when given character is missing in the path.
+---  "-1": Return dummy -1 for this index; essentially up to the caller to decide what to do.
+---  "end": Return index after last character in path.
+---  "nearby": Return index close to previous character index; useful for quick visualization at the
+---            cost of overwriting other characters in the path.
+---Defaults to "-1".
+---@field case_matching? "exact" | "ignore" | "smart" Handling for matching characters with different casing.
+--- "exact": Only match when keymap character has same case as path character.
+--- "ignore": Match when keymap character is same as path character ignoring case.
+--- "smart": Match when keymap character is same as path character ignoring case, unless keymap
+---          characters is upper case.
+---Defaults to "smart".
 
 ---@param path string | string[]
 ---@param keymap string
@@ -309,6 +337,7 @@ function M.keymap_location_in_path(path, keymap, opts)
 
   opts = opts or {}
   local missing_behavior = opts.missing_behavior or "-1"
+  local case_matching = opts.case_matching or "smart"
 
   -- Returned indexes are relative to the full path string, not individual path tokens. This mapping
   -- allows us to determine full path index while checking each path token one by one.
@@ -334,7 +363,8 @@ function M.keymap_location_in_path(path, keymap, opts)
       local token_chars = vim.split(path_token, "")
       for j, char in ipairs(token_chars) do
         local path_index = offset + j
-        if key == char and not vim.tbl_contains(path_indexes, path_index) then
+        -- if key == char and not vim.tbl_contains(path_indexes, path_index) then
+        if is_character_match(key, char, case_matching) and not vim.tbl_contains(path_indexes, path_index) then
           table.insert(path_indexes, path_index)
           location_found = true
           break
@@ -371,8 +401,12 @@ function M.keymap_location_in_path(path, keymap, opts)
 end
 
 ---@class hopper.HighlightPathOptions
----@field next_key_index? integer
----@field default_highlight_name? string Defaults to "hopper.MutedText".
+---@field next_key_index? integer Index in keymap of next character to select. Useful for highlighting during live typing, as next character to type for this path is underlined.
+---@field default_highlight_name? string Name for rest of path that is not highlighted by keymaps. Defaults to "hopper.MutedText".
+---@field case_mismatch_behavior? "keep" | "replace" Handling for when keymap character that is being inserted has a different case from character in the path.
+---  "keep": Keep the original path character.
+---  "replace": Replace with keymap character.
+---Defaults to "keep".
 
 ---@param path string
 ---@param keymap string
@@ -383,50 +417,55 @@ function M.highlight_path_virtual_text(path, keymap, keymap_indexes, opts)
   opts = opts or {}
   local next_key_index = opts.next_key_index or -1
   local default_highlight_name = opts.default_highlight_name == nil and "hopper.MutedText" or opts.default_highlight_name
+  local case_mismatch_behavior = opts.case_mismatch_behavior or "keep"
 
   local highlighted_parts = {} ---@type string[][]
   local start_idx = 1
   local sorted_indexes = require("hopper.utils").sorted(keymap_indexes)
   for _, idx in ipairs(sorted_indexes) do
     local part = string.sub(path, start_idx, idx - 1)
-    local key ---@type string
+    local insert_char ---@type string
     local hl_name ---@type string
     if idx == keymap_indexes[1] then
-      key = string.sub(keymap, 1, 1)
+      insert_char = string.sub(keymap, 1, 1)
       if next_key_index == 1 then
         hl_name = "hopper.FirstKeyNext"
       else
         hl_name = "hopper.FirstKey"
       end
     elseif idx == keymap_indexes[2] then
-      key = string.sub(keymap, 2, 2)
+      insert_char = string.sub(keymap, 2, 2)
       if next_key_index == 2 then
         hl_name = "hopper.SecondKeyNext"
       else
         hl_name = "hopper.SecondKey"
       end
     elseif idx == keymap_indexes[3] then
-      key = string.sub(keymap, 3, 3)
+      insert_char = string.sub(keymap, 3, 3)
       if next_key_index == 3 then
         hl_name = "hopper.ThirdKeyNext"
       else
         hl_name = "hopper.ThirdKey"
       end
     elseif idx == keymap_indexes[4] then
-      key = string.sub(keymap, 4, 4)
+      insert_char = string.sub(keymap, 4, 4)
       if next_key_index == 4 then
         hl_name = "hopper.FourthKeyNext"
       else
         hl_name = "hopper.FourthKey"
       end
     end
-    -- table.insert(highlighted_parts, {part, "hopper.MutedText"})
+    if case_mismatch_behavior == "keep" then
+      local path_char = string.sub(path, idx, idx)
+      if insert_char ~= path_char and string.lower(insert_char) == string.lower(path_char) then
+        insert_char = path_char
+      end
+    end
     table.insert(highlighted_parts, {part, default_highlight_name})
-    table.insert(highlighted_parts, {key, hl_name})
+    table.insert(highlighted_parts, {insert_char, hl_name})
     start_idx = idx + 1
   end
   local part = string.sub(path, start_idx)
-  -- table.insert(highlighted_parts, {part, "hopper.MutedText"})
   table.insert(highlighted_parts, {part, default_highlight_name})
   return highlighted_parts
 end

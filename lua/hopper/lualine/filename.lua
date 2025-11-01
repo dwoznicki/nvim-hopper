@@ -35,7 +35,7 @@ function HopperFilename:update_status()
   end
   -- We hae to assume the Lualine filename includes the path. Otherwise, the hgihlighted parts won't
   -- match what we show in the file list. Not that big of a deal.
-  local keymap_indexes = keymaps.keymap_location_in_path(orig_filename, file_keymap.keymap, {missing_behavior = "end"})
+  local keymap_indexes = keymaps.keymap_location_in_path(orig_filename, file_keymap.keymap, {missing_behavior = "end", case_matching = "smart"})
   local path_line = keymaps.highlight_path_virtual_text(orig_filename, file_keymap.keymap, keymap_indexes, {default_highlight_name = ""})
   local joined_path = ""
   for _, text_and_hl_name in ipairs(path_line) do
