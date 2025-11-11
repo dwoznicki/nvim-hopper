@@ -31,39 +31,9 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ## Usage
 
-### Open a file by keymapping
+To create a file keymapping, open the file you want to map, then call `toggle_hopper` to open the hopper view. Press `<esc>` to enter normal mode, then `m` to open the keymapper. Type in the desired keymap, then `<cr>` to save. The given keymap is now stored for future use within the current project.
 
-Open the hopper view. You can do this with 
-
-```
-:lua require("hopper").toggle_hopper()`
-```
-
-but it's recommended that you create a simple keymap this function.
-
-Type in the keymap. If a file keymapping exists, nvim-hopper will open the file as soon as the last character is entered.
-
-### Create a file keymapping
-
-Open the file you want to map.
-
-Create a keymapping by either:
-
-- Open the hopper view, `<esc>` to enter normal mode, then `m` to open the keymapper view.
-- Open the keymapper view directly with
-  ```
-  :lua require("hopper").toggle_keymapper()
-  ```
-
-### Projects
-
-nvim-hopper will partition file keymaps by project by default. Projects can be created, changed, or deleted from the project menu. To open the project menu
-
-- Open the hopper view, `<esc>` to enter normal mode, then `p` to open the project view.
-- Open the project menu view directly with
-  ```
-  :lua require("hopper").open_project_menu()
-  ```
+To open a file, call `toggle_hopper` then type in the keymap. Once you type in the last character, nvim-hopper will immediately attempt to open the mapped file.
 
 ## Configuration
 
