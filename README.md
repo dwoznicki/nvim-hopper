@@ -7,10 +7,11 @@ Hop around common files with mnemonic key mappings.
 ## Requirements
 
 - neovim must be v0.10.0 or greater.
-- sqlite3 must be available on the path. To check, run
+- sqlite3 must be installed, and ideally available on the $PATH. To check, run
   ```bash
   sqlite3 --version
   ```
+  On Windows, the plugin will attempt to download the library, but this is best effort.
 
 ## Installation
 
@@ -22,10 +23,130 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim)
   config = function()
     local hopper = require("hopper")
     hopper.setup()
+    -- Optional, but recommended.
     vim.keymap.set("n", "<leader>u", hopper.toggle_hopper, {desc = "Toggle hopper"})
   end
 }
 ```
+
+## Usage
+
+### Open a file by keymapping
+
+Open the hopper view. You can do this with 
+
+```
+:lua require("hopper").toggle_hopper()`
+```
+
+but it's recommended that you create a simple keymap this function.
+
+Type in the keymap. If a file keymapping exists, nvim-hopper will open the file as soon as the last character is entered.
+
+### Create a file keymapping
+
+Open the file you want to map.
+
+Create a keymapping by either:
+
+- Open the hopper view, `<esc>` to enter normal mode, then `m` to open the keymapper view.
+- Open the keymapper view directly with
+  ```
+  :lua require("hopper").toggle_keymapper()
+  ```
+
+### Projects
+
+nvim-hopper will partition file keymaps by project by default. Projects can be created, changed, or deleted from the project menu. To open the project menu
+
+- Open the hopper view, `<esc>` to enter normal mode, then `p` to open the project view.
+- Open the project menu view directly with
+  ```
+  :lua require("hopper").open_project_menu()
+  ```
+
+## Configuration
+
+These are the default setup options.
+
+```lua
+{
+  keymapping = {
+    -- Available keys for keymaps alphanumeric.
+    keyset = "abcdefghijklmnopqrstuvwxyz1234567890",
+    -- All keymaps must be exactly 2 characters long.
+    length = 2,
+    -- When a file is selected, use this command to open it by default. Equivalent to `:edit $FILE`.
+    default_open_cmd = "edit",
+  },
+  db = {
+    -- Path to find sqlite3 binary. Expect to find the binary in the $PATH on Mac/Linux, or path to
+    -- Vim cached `sqlite.dll` on Windows.
+    sqlite_path = "sqlite3",
+    -- Path to sqlite3 database file. Probably `~/.local/share/nvim/hopper/hopper.db`.
+    database_path = require("hopper.db.sqlite").DEFAULT_DB_PATH,
+  },
+  float = {
+    -- Floating window width/height. A number between 0 and 1 is treated as a percentage of
+    -- available space. A number greater than 1 is treated as an exact character size.
+    width = 0.6, -- 60% of available width
+    height = 0.6, -- 60% of available height
+  },
+  -- Colors are determined at setup time. They are mostly based on the values the current
+  -- colorscheme applies to common highlight names.
+  colors = {
+    project = nil, -- "Statement"
+    action = nil, -- "Function"
+    first_key = nil, -- "Exception"
+    second_key = nil, -- "Special"
+    third_key = nil, -- "Identifier"
+    fourth_key = nil, -- "String"
+  },
+  actions = {
+    display = {
+      -- Display for special keys, which Vim typically represents in format `<KEY>`.
+      -- There are some sensible defaults which require a nerdfont to display properly.
+      special_keys = {
+        ["<cr>"] = "󰌑 ",
+        ["<tab>"] = "󰌒 ",
+        ["<bs>"] = "󰁮 ",
+        ["<esc>"] = "󱊷 ",
+      },
+    },
+    -- Change the keymaps that perform standard actions in different views.
+    hopper = {
+      -- Switch to keymapper float, assigning to current file.
+      open_keymapper = {"m"},
+      -- Switch to picker, if configured.
+      open_picker = {";"},
+      -- Switch to project control menu.
+      open_project_menu = {"p"},
+      -- Close hopper float.
+      close = {"q"},
+    },
+    keymapper = {
+      -- Confirm new keymap for file.
+      confirm = {"<cr>"},
+      -- Autocomplete suggested keymap.
+      accept_suggestion = {"<tab>"},
+      -- Return to previous float view, if one is available.
+      go_back = {"<bs>"},
+      -- Close keymapper float.
+      close = {"q"},
+    },
+    new_project = {
+      -- Confirm new project.
+      confirm = {"<cr>"},
+      -- Autocomplete suggested project name/path.
+      accept_suggestion = {"<tab>"},
+      -- Close new project float.
+      close = {"q"},
+    },
+  },
+}
+```
+
+## API
 
 ## Motivation
 
